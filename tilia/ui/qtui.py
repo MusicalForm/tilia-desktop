@@ -8,7 +8,14 @@ from typing import Optional
 
 from PyQt6 import QtGui
 from PyQt6.QtCore import QKeyCombination, Qt, qInstallMessageHandler, QUrl, QtMsgType
-from PyQt6.QtGui import QIcon, QFontDatabase, QDesktopServices, QPainter, QPixmap
+from PyQt6.QtGui import (
+    QIcon,
+    QFontDatabase,
+    QDesktopServices,
+    QPainter,
+    QPixmap,
+    qt_set_sequence_auto_mnemonic,
+)
 from PyQt6.QtWidgets import (
     QMainWindow,
     QApplication,
@@ -153,6 +160,10 @@ class QtUI:
         self._setup_dialog_manager()
         self._setup_menus()
         self._setup_windows()
+
+        # Enable mnemonics in Mac
+        # See: https://doc.qt.io/qt-6/qkeysequence.html#qt_set_sequence_auto_mnemonic
+        qt_set_sequence_auto_mnemonic(True)
 
         self.is_error = False
 
