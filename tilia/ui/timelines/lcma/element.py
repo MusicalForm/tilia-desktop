@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QColor, QPen
+
 from tilia.ui.color import get_tinted_color
 from tilia.ui.consts import TINT_FACTOR_ON_SELECTION
 from tilia.ui.timelines.copy_paste import CopyAttributes
-from tilia.ui.timelines.hierarchy.element import HierarchyLabel, HierarchyUI
+from tilia.ui.timelines.hierarchy.element import (
+    HierarchyBody,
+    HierarchyLabel,
+    HierarchyUI,
+)
 from tilia.ui.timelines.lcma.context_menu import LcmaFormContextMenu
 from tilia.ui.timelines.lcma.span_view import (
     display_label,
@@ -83,6 +90,24 @@ class LcmaFormUI(HierarchyUI):
 
     # --- rendering (override the label to draw the annotation headline) --------
 
+    def _setup_body(self):
+        # Same as HierarchyUI._setup_body but with a notional-aware body, so a notional
+        # function ("…") draws the dashed border channel from the render contract.
+        self.body = LcmaFormBody(
+            self.get_data("level"),
+            self.start_x,
+            self.end_x,
+            self.timeline_ui.get_data("height"),
+            self.ui_color,
+        )
+        self.scene.addItem(self.body)
+        self._apply_notional_border()
+
+    def _apply_notional_border(self):
+        model = self.span_model
+        notional = model.flags.notional if model else False
+        self.body.set_notional(notional, self.is_selected())
+
     def _setup_label(self):
         text = self._display_text(self.end_x - self.start_x)
         self.update_label_substrings_widths(text)
@@ -110,10 +135,11 @@ class LcmaFormUI(HierarchyUI):
         self.update_label_position(level, height, start_x, end_x)
 
     def update_annotation_data(self):
-        # A builder-dock edit landed. Re-parse and repaint fill, label and tooltip.
+        # A builder-dock edit landed. Re-parse and repaint fill, label, border and tooltip.
         self._span_model_src = None
         self.update_color()
         self.update_label()
+        self._apply_notional_border()
         self._update_tooltip()
 
     def _update_tooltip(self):
@@ -144,3 +170,32 @@ class LcmaFormUI(HierarchyUI):
         dock = get_builder_dock_if_exists()
         if dock is not None:
             dock.clear_annotation(self.id)
+
+
+class LcmaFormBody(HierarchyBody):
+    """A hierarchy body that draws a dashed border when its unit's function is *notional*
+    (the render contract's ``.is-notional`` channel — a function the analyst marks as implied,
+    not literally present). Selection still shows the solid pen; on deselect the body returns
+    to the dashed border instead of no border, so the channel survives select/deselect.
+    """
+
+    def __init__(self, *args, **kwargs):
+        # Must exist before super().__init__, which calls set_pen_style_no_pen().
+        self.notional = False
+        super().__init__(*args, **kwargs)
+
+    def set_notional(self, notional: bool, selected: bool) -> None:
+        self.notional = notional
+        # Don't disturb the solid selection pen; the dashed border is (re)applied on deselect
+        # via HierarchyBody.on_deselect -> set_pen_style_no_pen.
+        if not selected:
+            self.set_pen_style_no_pen()
+
+    def set_pen_style_no_pen(self):
+        # "no border" becomes "dashed border" for a notional unit.
+        if self.notional:
+            pen = QPen(QColor("black"))
+            pen.setStyle(Qt.PenStyle.DashLine)
+            self.setPen(pen)
+        else:
+            super().set_pen_style_no_pen()
