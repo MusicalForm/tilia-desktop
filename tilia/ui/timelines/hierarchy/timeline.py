@@ -2,7 +2,6 @@ import tilia.ui.strings
 import tilia.ui.timelines.copy_paste
 from tilia.requests import Get, Post, get, listen, post
 from tilia.settings import settings
-from tilia.timelines.component_kinds import ComponentKind
 from tilia.timelines.hierarchy.timeline import HierarchyTimeline
 from tilia.ui import commands
 from tilia.ui.menus import HierarchyMenu
@@ -200,7 +199,7 @@ class HierarchyTimelineUI(TimelineUI):
         ) + new_parent.tl_component.end
 
         component, _ = self.timeline.create_component(
-            kind=ComponentKind.HIERARCHY,
+            kind=self.timeline.COMPONENT_KIND,
             start=new_child_start,
             end=new_child_end,
             level=child_pastedata_["context"]["level"],
@@ -259,7 +258,7 @@ class HierarchyTimelineUI(TimelineUI):
     def get_max_hierarchy_height(self):
         max_level = max(
             self.timeline.component_manager.get_existing_values_for_attr(
-                "level", ComponentKind.HIERARCHY
+                "level", self.timeline.COMPONENT_KIND
             )
         )
         return HierarchyUI.base_height() + (
