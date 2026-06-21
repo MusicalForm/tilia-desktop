@@ -289,3 +289,79 @@ class TestChannels:
         assert "• texture: homophonic" in tip
         assert "• harmony → Verse (Louder than)" in tip
         assert "• uncertain" in tip
+
+
+# --- robustness: hand-edited / non-builder JSON-LD must never crash the renderer ----
+# annotation_data is a free string field on the component, so a .tla can carry anything (a
+# hand edit, a future schema, a truncated write). parse_span_model must return None or a safe
+# model — never raise — and every downstream consumer must survive whatever it returns.
+
+
+class TestRobustness:
+    MALFORMED = [
+        '{"forms": ["x"]}',  # form is not an object
+        '{"forms": [null]}',  # form is null
+        '{"forms": [{"@type": "lcma:Form", "function": {}}]}',  # no hasCategory
+        '{"forms": [{"@type": "lcma:Form", "function": {"hasCategory": "fn:x"}}],'
+        ' "hasAttribute": {"k": "v"}}',  # hasAttribute is a dict, not a list
+        '{"forms": [{"@type":"lcma:Form","function":{"hasCategory":"fn:x"}}],'
+        ' "hasAttribute":[{"key":"k","valueRef":[{}]}]}',  # ref with no refTarget
+        '{"forms": [{"@type":"lcma:Form","function":{"hasCategory":"fn:x"},'
+        ' "formalType":"oops"}]}',  # formalType not an object
+    ]
+
+    NON_MODELS = ["", "   ", "not json", "[1,2,3]", "42", "null", '"hi"']
+
+    def test_non_objects_return_none(self):
+        for data in self.NON_MODELS:
+            assert sv.parse_span_model(data) is None, data
+
+    def test_malformed_objects_parse_without_crashing(self):
+        for data in self.MALFORMED:
+            m = sv.parse_span_model(data)
+            assert m is not None, data  # a JSON object always yields a (safe) model
+            # every consumer must survive the model
+            for lod in ("full", "med", "short", "min"):
+                assert isinstance(sv.display_label(m, lod), str)
+            assert isinstance(sv.span_tooltip(m), str)
+            assert all(b.glyph for b in sv.badges_for(m))
+            assert m.color.startswith("#") and len(m.color) == 7
+
+    def test_deeply_nested_transformation(self):
+        data = json.dumps(
+            {
+                "forms": [
+                    {
+                        "@type": "lcma:Form",
+                        "function": {
+                            "@type": "lcma:FunctionTransformation",
+                            "source": {
+                                "@type": "lcma:FunctionTransformation",
+                                "source": {"hasCategory": "fn:basic_idea"},
+                                "target": {"hasCategory": "fn:cadence"},
+                            },
+                            "target": {"hasCategory": "fn:transition"},
+                        },
+                    }
+                ]
+            }
+        )
+        m = sv.parse_span_model(data)
+        assert "→" in m.primary and m.primary.count("→") == 2
+        assert m.flags.operator == "transformation"
+
+    def test_unicode_reference_target_round_trips(self):
+        # refTarget is percent-encoded by the builder (unitIri); _unit_name must decode it
+        data = json.dumps(
+            {
+                "forms": [{"@type": "lcma:Form", "function": {"hasCategory": "fn:x"}}],
+                "hasAttribute": [
+                    {
+                        "key": {"@id": "lcma:harmony"},
+                        "valueRef": [{"refTarget": "anno:Th%C3%A8me%20A"}],
+                    }
+                ],
+            }
+        )
+        m = sv.parse_span_model(data)
+        assert m.refs[0].target == "Thème A"
