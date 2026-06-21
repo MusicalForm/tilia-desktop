@@ -48,6 +48,7 @@ class Get(Enum):
     RIGHT_MARGIN_X = auto()
     SELECTED_TIME = auto()
     SCORE_VIEWER = auto()
+    LCMA_BUILDER = auto()
     TIMELINE = auto()
     TIMELINES = auto()
     TIMELINE_BY_ATTR = auto()
