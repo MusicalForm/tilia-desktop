@@ -31,6 +31,20 @@ class TestFamilyColour:
         assert len(sv.span_color_hex("Main theme")) == 7
         assert sv.span_color_hex("Wibble") == sv.span_color_hex("also unmatched")
 
+    def test_span_fill_is_the_web_composite_not_the_raw_hue(self):
+        # The painted fill is the hue laid over the white track at .span-fill opacity, so it is
+        # much paler than the raw family hue — this is what makes it match the reference editor.
+        raw = sv.span_color_hex("Main theme")
+        fill = sv.span_fill_hex("Main theme")
+        assert fill != raw
+        assert len(fill) == 7 and fill.startswith("#")
+        # composited over white -> every channel is lighter than the raw hue
+        assert all(
+            int(fill[i : i + 2], 16) >= int(raw[i : i + 2], 16) for i in (1, 3, 5)
+        )
+        # standalone uses a still-lower opacity, so it is paler again than the base grey fill
+        assert sv.span_fill_hex("x", standalone=True) != sv.span_fill_hex("x")
+
 
 # --- prettify / LOD ------------------------------------------------------------
 
@@ -40,6 +54,15 @@ class TestPrettifyAndLod:
         assert sv.prettify("basic_idea") == "Basic idea"
         assert sv.prettify("hybrid1") == "Hybrid 1"
         assert sv.prettify("") == ""
+
+    def test_abbr_maps_loaded_from_vendored_vocab(self):
+        # the vendored vocab.json must actually load, so headlines match the reference editor
+        assert sv.FUNCTION_ABBR.get("basic_idea") == "bi"
+        assert sv.FUNCTION_ABBR.get("transition") == "tr"
+        assert sv.MAIN_TYPE_ABBR.get("period") == "pd"
+
+    def test_abbr_falls_back_to_prettify_for_unknown_name(self):
+        assert sv._abbr(sv.FUNCTION_ABBR, "not_a_real_term") == "Not a real term"
 
     def test_lod_thresholds(self):
         assert sv.lod_for(200) == "full"
@@ -108,9 +131,13 @@ class TestParse:
     def test_named_form(self):
         m = sv.parse_span_model(_named_jsonld())
         assert m.name == "Theme A"
-        assert m.primary == "Basic idea"
-        assert m.secondary == "Period"
-        assert m.color == sv.span_color_hex("Basic idea")  # green family
+        assert m.primary == sv.FUNCTION_ABBR["basic_idea"]  # abbreviated headline
+        assert m.primary_full == "Basic idea"  # un-abbreviated, for tooltip/detail
+        assert m.secondary == sv.MAIN_TYPE_ABBR["period"]
+        assert m.secondary_full == "Period"
+        assert m.color == sv.span_fill_hex(
+            "Basic idea"
+        )  # green family, track-composited
         assert m.flags.material is True
         assert m.flags.uncertain is True
         assert m.flags.operator is None
@@ -136,7 +163,9 @@ class TestParse:
             }
         )
         m = sv.parse_span_model(data)
-        assert m.primary == "Basic idea→Contrasting idea"
+        bi, ci = sv.FUNCTION_ABBR["basic_idea"], sv.FUNCTION_ABBR["contrasting_idea"]
+        assert m.primary == f"{bi}→{ci}"
+        assert m.primary_full == "Basic idea→Contrasting idea"
         assert m.flags.operator == "transformation"
 
     def test_notional_function_is_quoted(self):
@@ -151,7 +180,8 @@ class TestParse:
             }
         )
         m = sv.parse_span_model(data)
-        assert m.primary == "“Basic idea”"
+        assert m.primary == f"“{sv.FUNCTION_ABBR['basic_idea']}”"  # abbr, quoted
+        assert m.primary_full == "“Basic idea”"
         assert m.flags.notional is True
 
     def test_placeholder(self):
@@ -164,8 +194,18 @@ class TestParse:
             }
         )
         m = sv.parse_span_model(data)
+        # not a controlled placeholder in the vocab -> prettified fallback (both tiers)
         assert m.primary == "Fortspinnung"
+        assert m.primary_full == "Fortspinnung"
         assert m.flags.standalone is False
+
+    def test_placeholder_uses_vocab_abbr_when_present(self):
+        data = json.dumps(
+            {"forms": [{"@type": "lcma:Placeholder", "hasCategory": "ph:repeat"}]}
+        )
+        m = sv.parse_span_model(data)
+        assert m.primary == sv.PLACEHOLDER_ABBR["repeat"]  # "%"
+        assert m.primary_full == "Repeat"
 
     def test_standalone_is_grey_and_flagged(self):
         data = json.dumps(
@@ -183,7 +223,7 @@ class TestParse:
         m = sv.parse_span_model(data)
         assert m.primary == "Description"
         assert m.flags.standalone is True
-        assert m.color == sv.span_color_hex("anything unmatched")  # forced grey
+        assert m.color == sv.span_fill_hex("x", standalone=True)  # forced grey, paler
         assert m.attrs == [("mykey", "v")]
 
     def test_soft_attribute_key_stays_literal(self):
@@ -232,11 +272,12 @@ class TestChannels:
 
     def test_display_label_sheds_by_tier(self):
         m = sv.parse_span_model(_named_jsonld())
+        bi, pd = sv.FUNCTION_ABBR["basic_idea"], sv.MAIN_TYPE_ABBR["period"]
         full = sv.display_label(m, "full")
-        assert "Theme A" in full and "Basic idea" in full and "Period" in full
-        # short: headline only + a dot (it carries badges)
+        assert "Theme A" in full and bi in full and pd in full
+        # short: abbreviated headline only + a dot (it carries badges)
         short = sv.display_label(m, "short")
-        assert short == "Basic idea •"
+        assert short == f"{bi} •"
         # min: nothing — the colour fill carries the family
         assert sv.display_label(m, "min") == ""
 

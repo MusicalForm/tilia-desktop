@@ -1,19 +1,15 @@
 """Project an LCMA annotation (a JSON-LD string) into the visual channels a timeline span
 can carry, plus a level-of-detail (LOD) ladder keyed to the span's pixel width.
 
-Python port (MVP, "strategy C") of the web reference spec
-``annotation-ui/src/model/spanView.ts``. Kept Qt-free and dependency-free so it is unit
-testable on its own and the element code stays thin. Two deliberate MVP simplifications
-relative to the TS source, both because the data they need is not vendored into this fork:
-
-  * **No abbreviation.** ``FUNCTION_ABBR`` / ``MAIN_TYPE_ABBR`` come from the generated
-    ``vocab.json`` (sourced from ``ontology/lcma.ttl``), which lives in the annotation-ui
-    repo, not here. Headlines therefore use the *prettified full* term. Abbreviation is a
-    phase-B concern: the builder precomputes a display model from the same vocab and
-    persists it, and Python stops inferring.
-  * **Fusion / function-operator overlays** are not yet serialised into JSON-LD, so only the
-    cases that actually reach the wire are read (transformation via
-    ``lcma:FunctionTransformation``).
+Python port of the web reference spec ``annotation-ui/src/model/spanView.ts``. Kept Qt-free
+and dependency-free so it is unit testable on its own and the element code stays thin.
+Headline abbreviations come from the ontology vocab (``FUNCTION_ABBR`` / ``MAIN_TYPE_ABBR``,
+generated from ``ontology/lcma.ttl``); we vendor ``vocab.json`` next to this module so the
+timeline shows exactly what the reference editor does — see ``_load_abbr``. The painted fill
+matches the editor's rendered ``.span-fill`` (family hue composited over the white track) —
+see ``span_fill_hex``. One known gap: fusion / function-operator overlays are not yet
+serialised into JSON-LD, so only the cases that reach the wire are read (transformation via
+``lcma:FunctionTransformation``).
 
 Reads the compact JSON-LD the builder emits via ``toJsonLd``: the top-level ``name`` /
 ``forms`` / ``hasAttribute`` keys. The ``@context`` wrapper is present but ignored — the
@@ -26,6 +22,7 @@ import colorsys
 import json
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
 from urllib.parse import unquote
 
 # --- colour by function family -------------------------------------------------
@@ -57,16 +54,48 @@ def family_hue(headline_full: str) -> int | None:
     return None
 
 
-def _hsl_hex(h: int, s: int, lightness: int) -> str:
-    """HSL (degrees, %, %) -> ``#rrggbb`` (QColor parses hex; it does NOT parse ``hsl(...)``)."""
+def _hsl_rgb(h: int, s: int, lightness: int) -> tuple[int, int, int]:
     r, g, b = colorsys.hls_to_rgb(h / 360, lightness / 100, s / 100)
-    return "#{:02x}{:02x}{:02x}".format(round(r * 255), round(g * 255), round(b * 255))
+    return round(r * 255), round(g * 255), round(b * 255)
+
+
+def _hex(rgb: tuple[int, int, int]) -> str:
+    return "#{:02x}{:02x}{:02x}".format(*rgb)
+
+
+# The reference editor never paints the raw family hue: its ``.span-fill`` lays the hue over the
+# white track at a low opacity (styles.css), so what the analyst actually SEES is a pale tint.
+# We composite the same blend here and paint it opaquely, so the timeline rectangle matches the
+# web exactly instead of showing a far more saturated block.
+_TRACK_BG = (255, 255, 255)  # web --panel
+_FILL_ALPHA = 0.22  # .span-fill opacity
+_STANDALONE_ALPHA = 0.16  # .span.is-standalone .span-fill opacity
+
+
+def _blend_over_track(rgb: tuple[int, int, int], alpha: float) -> str:
+    return _hex(
+        tuple(
+            round(alpha * c + (1 - alpha) * bg)
+            for c, bg in zip(rgb, _TRACK_BG, strict=True)
+        )
+    )
 
 
 def span_color_hex(headline_full: str) -> str:
-    """Family fill as a ``#rrggbb`` hex string: ``hsl(hue 52% 52%)`` or the grey fallback."""
+    """The raw family hue as ``#rrggbb`` (``hsl(hue 52% 52%)`` or grey) — the colour IDENTITY,
+    before the track composite. Kept for reference/legends, not the painted fill."""
     hue = family_hue(headline_full)
-    return _hsl_hex(*_GREY_HSL) if hue is None else _hsl_hex(hue, 52, 52)
+    return _hex(_hsl_rgb(*_GREY_HSL) if hue is None else _hsl_rgb(hue, 52, 52))
+
+
+def span_fill_hex(headline_full: str, standalone: bool = False) -> str:
+    """The opaque fill the timeline paints. Matches the web's rendered ``.span-fill`` (the
+    family/grey hue composited over the white track at the CSS opacity), so the rectangle and
+    the reference editor agree. QColor parses the ``#rrggbb`` result; it does NOT parse ``hsl()``.
+    """
+    hue = None if standalone else family_hue(headline_full)
+    rgb = _hsl_rgb(*_GREY_HSL) if hue is None else _hsl_rgb(hue, 52, 52)
+    return _blend_over_track(rgb, _STANDALONE_ALPHA if standalone else _FILL_ALPHA)
 
 
 # --- display formatting (port of format.ts prettify) ---------------------------
@@ -76,6 +105,48 @@ def prettify(name: str) -> str:
     """``basic_idea`` -> ``Basic idea``; ``hybrid1`` -> ``Hybrid 1``. Display only."""
     spaced = re.sub(r"([A-Za-z])(\d)", r"\1 \2", name.replace("_", " "))
     return spaced[:1].upper() + spaced[1:] if spaced else spaced
+
+
+# --- abbreviations (from the vendored ontology vocab) --------------------------
+# The reference editor abbreviates headlines with maps generated from ontology/lcma.ttl
+# (annotation-ui src/generated/vocab.json). We vendor that same file next to this module so the
+# timeline shows the SAME abbreviations the web does — sourced from the ontology, not guessed.
+# It is a build artifact, kept in sync alongside the vendored embed.html; if it is ever missing
+# or malformed we degrade gracefully to the prettified full term.
+
+_VOCAB_PATH = Path(__file__).parent / "vocab.json"
+
+
+def _load_abbr() -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
+    """Build {name: abbr} maps for functions, main types and placeholders. Returns empty maps on
+    any failure (missing / malformed file), so abbreviation falls back to the prettified term.
+    """
+    try:
+        vocab = json.loads(_VOCAB_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}, {}, {}
+
+    def amap(entries) -> dict[str, str]:
+        return {e["name"]: e["abbr"] for e in entries if "name" in e and "abbr" in e}
+
+    fns = vocab.get("functions", {})
+    # specific first, then generic_units — generic wins on the lone name collision, matching the
+    # web's FUNCTION_ABBR construction order.
+    function_abbr = {
+        **amap(fns.get("specific", [])),
+        **amap(fns.get("generic_units", [])),
+    }
+    type_abbr = amap(vocab.get("types", {}).get("main", []))
+    placeholder_abbr = amap(vocab.get("placeholders", []))
+    return function_abbr, type_abbr, placeholder_abbr
+
+
+FUNCTION_ABBR, MAIN_TYPE_ABBR, PLACEHOLDER_ABBR = _load_abbr()
+
+
+def _abbr(mapping: dict[str, str], name: str) -> str:
+    """The vocab abbreviation for a controlled name, or its prettified full form as a fallback."""
+    return mapping.get(name) or prettify(name)
 
 
 # --- model ---------------------------------------------------------------------
@@ -102,11 +173,13 @@ class SpanRef:
 @dataclass
 class SpanModel:
     name: str = ""
-    primary: str = "—"  # headline (MVP: prettified full function/placeholder name)
-    primary_full: str = "—"
-    secondary: str = ""  # formal type (MVP: prettified full main type)
+    primary: str = "—"  # headline: vocab abbreviation (function / placeholder)
+    primary_full: str = "—"  # un-abbreviated, for tooltip / detail
+    secondary: str = ""  # formal type: vocab abbreviation
     secondary_full: str = ""
-    color: str = ""  # #rrggbb fill, by function family
+    color: str = (
+        ""  # #rrggbb opaque fill (family hue composited over the track, matches web)
+    )
     flags: SpanFlags = field(default_factory=SpanFlags)
     refs: list[SpanRef] = field(default_factory=list)
     attrs: list[tuple[str, str]] = field(default_factory=list)
@@ -147,12 +220,17 @@ def _unit_name(iri: str) -> str:
     return unquote(_local(iri))  # inverse of unitIri (encodeURIComponent)
 
 
-def _fn_headline(fn: dict) -> str:
-    """A function node rendered to one line: a transformation as ``a→b``, else the
-    (prettified) category, quoted when notional. MVP: no abbreviation."""
+def _fn_headline(fn: dict, abbreviate: bool) -> str:
+    """A function node rendered to one line: a transformation as ``a→b``, else the function
+    category (abbreviated via the vocab, or prettified in full), quoted when notional.
+    """
     if fn.get("@type") == "lcma:FunctionTransformation":
-        return f"{_fn_headline(fn.get('source') or {})}→{_fn_headline(fn.get('target') or {})}"
-    base = prettify(_local(fn.get("hasCategory", ""))) or "—"
+        return (
+            f"{_fn_headline(fn.get('source') or {}, abbreviate)}→"
+            f"{_fn_headline(fn.get('target') or {}, abbreviate)}"
+        )
+    name = _local(fn.get("hasCategory", ""))
+    base = (_abbr(FUNCTION_ABBR, name) if abbreviate else prettify(name)) or "—"
     return f"“{base}”" if fn.get("notional") else base
 
 
@@ -206,22 +284,23 @@ def parse_span_model(jsonld: str) -> SpanModel | None:
 
     if isinstance(form, dict):
         if form.get("@type") == "lcma:Placeholder":
-            primary = primary_full = (
-                prettify(_local(form.get("hasCategory", ""))) or "—"
-            )
+            ph_name = _local(form.get("hasCategory", ""))
+            primary = _abbr(PLACEHOLDER_ABBR, ph_name) or "—"
+            primary_full = prettify(ph_name) or "—"
             material = "material" in form
         else:
             fn = form.get("function") or {}
-            primary = primary_full = _fn_headline(fn)
+            primary = _fn_headline(fn, True)
+            primary_full = _fn_headline(fn, False)
             operator = _fn_operator(fn)
             notional = bool(fn.get("notional"))
             material = "material" in form
             uncertain = form.get("certainty") == "uncertain"
             ftype = form.get("formalType")
             if isinstance(ftype, dict):
-                secondary = secondary_full = prettify(
-                    _local(ftype.get("hasCategory", ""))
-                )
+                main = _local(ftype.get("hasCategory", ""))
+                secondary = _abbr(MAIN_TYPE_ABBR, main)
+                secondary_full = prettify(main)
     elif standalone and name:
         primary = primary_full = prettify(name)
     elif standalone:
@@ -236,7 +315,7 @@ def parse_span_model(jsonld: str) -> SpanModel | None:
         uncertain=uncertain,
         standalone=standalone,
     )
-    color = _hsl_hex(*_GREY_HSL) if standalone else span_color_hex(primary_full)
+    color = span_fill_hex(primary_full, standalone)
     return SpanModel(
         name=name,
         primary=primary,

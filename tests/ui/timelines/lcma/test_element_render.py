@@ -40,7 +40,7 @@ class TestAnnotatedRender:
         el.set_data("annotation_data", _jsonld())
         assert el.span_model is not None
         assert _name(el.body.brush().color().name()) == _name(
-            sv.span_color_hex("Basic idea")
+            sv.span_fill_hex("Basic idea")
         )
 
     def test_label_shows_headline_at_full_width(self, lcma_form_ui):
@@ -48,7 +48,9 @@ class TestAnnotatedRender:
         el.set_data("annotation_data", _jsonld())
         # px width is view-dependent; assert the composed text directly at a full tier.
         text = el._display_text(250)
-        assert "Theme A" in text and "Basic idea" in text and "Period" in text
+        assert "Theme A" in text  # name
+        assert sv.FUNCTION_ABBR["basic_idea"] in text  # abbreviated function
+        assert sv.MAIN_TYPE_ABBR["period"] in text  # abbreviated type
 
     def test_tooltip_is_set_from_annotation(self, lcma_form_ui):
         el = lcma_form_ui
@@ -72,17 +74,19 @@ class TestLiveRepaintLynchpin:
         # connective amber -> closing red: a single edit must move every channel.
         el.set_data("annotation_data", _jsonld(name="Br", category="fn:transition"))
         assert _name(el.body.brush().color().name()) == _name(
-            sv.span_color_hex("Transition")
+            sv.span_fill_hex("Transition")
         )
-        assert "Transition" in el._display_text(250)
-        assert "Br" in el.body.toolTip()
+        assert sv.FUNCTION_ABBR["transition"] in el._display_text(250)
+        assert "Br" in el.body.toolTip()  # name + full term live in the tooltip
+        assert "Transition" in el.body.toolTip()
 
         el.set_data("annotation_data", _jsonld(name="Cad", category="fn:cadence"))
         assert _name(el.body.brush().color().name()) == _name(
-            sv.span_color_hex("Cadence")
+            sv.span_fill_hex("Cadence")
         )
-        assert "Cadence" in el._display_text(250)
+        assert sv.FUNCTION_ABBR["cadence"] in el._display_text(250)
         assert "Cad" in el.body.toolTip()
+        assert "Cadence" in el.body.toolTip()
 
     def test_clearing_annotation_reverts_to_plain(self, lcma_form_ui):
         el = lcma_form_ui
