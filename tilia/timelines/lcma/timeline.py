@@ -31,3 +31,5 @@ class LcmaTimeline(HierarchyTimeline):
         TimelineFlag.COMPONENTS_COLORED,
         TimelineFlag.COMPONENTS_COPYABLE,
     ]
+    # "LCMA" is an acronym; without this the menu would read "Lcma" (type_name capitalised).
+    ADD_MENU_TEXT = "&LCMA"

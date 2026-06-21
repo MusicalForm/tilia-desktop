@@ -3,6 +3,7 @@ from __future__ import annotations
 from tilia.timelines.lcma.timeline import LcmaTimeline
 from tilia.ui.timelines.hierarchy.timeline import HierarchyTimelineUI
 from tilia.ui.timelines.lcma.element import LcmaFormUI
+from tilia.ui.timelines.lcma.toolbar import LcmaTimelineToolbar
 
 
 class LcmaTimelineUI(HierarchyTimelineUI):
@@ -16,14 +17,13 @@ class LcmaTimelineUI(HierarchyTimelineUI):
     shortcuts (s / g / e / c) are disambiguated by the last-clicked timeline
     kind.
 
-    Toolbar and dynamic menu are left off for now (set to ``None`` so the
-    Hierarchy ones — whose buttons fire ``timeline.hierarchy.*`` — are not
-    inherited). Editing is available via keyboard shortcuts and the
-    LCMA context menu; the dedicated toolbar and the builder dock arrive in the
-    next phase.
+    The toolbar (``LcmaTimelineToolbar``) fires that ``timeline.lcma.*`` family,
+    so its buttons act on this kind. ``menu_class`` stays ``None``: the Hierarchy
+    menu only offers CSV import, which LCMA does not support (annotations come
+    from the embedded builder); the "Add LCMA" entry lives in the Add menu.
     """
 
     ELEMENT_CLASS = LcmaFormUI
     timeline_class = LcmaTimeline
-    TOOLBAR_CLASS = None
+    TOOLBAR_CLASS = LcmaTimelineToolbar
     menu_class = None

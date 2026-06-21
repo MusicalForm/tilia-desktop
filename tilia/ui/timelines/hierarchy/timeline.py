@@ -229,8 +229,11 @@ class HierarchyTimelineUI(TimelineUI):
                 children_of_element.append(child_component)
 
     def get_copy_data_from_hierarchy_ui(self, hierarchy_ui: HierarchyUI):
+        # Use the element's OWN copy attributes, not HierarchyUI's, so a subclass (e.g.
+        # LcmaFormUI, which adds annotation_data) copies its extra fields instead of silently
+        # dropping them. Behaviour-preserving for plain hierarchies.
         ui_data = get_copy_data_from_element(
-            hierarchy_ui, HierarchyUI.DEFAULT_COPY_ATTRIBUTES
+            hierarchy_ui, hierarchy_ui.DEFAULT_COPY_ATTRIBUTES
         )
 
         if children := hierarchy_ui.get_data("children"):

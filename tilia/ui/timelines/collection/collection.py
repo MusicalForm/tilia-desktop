@@ -133,11 +133,14 @@ class TimelineUIs:
             name = backend.type_name().lower()
             if backend is not SliderTimeline:
                 # Qt uses `&` to mark the next character as the menu accelerator
-                # (the underlined letter the Alt-shortcut targets). Most kinds
-                # take the first letter; harmony already collides with
+                # (the underlined letter the Alt-shortcut targets). A kind may set
+                # ADD_MENU_TEXT to control its label (e.g. the "LCMA" acronym); most
+                # kinds take the first letter; harmony already collides with
                 # "Hierarchy" so we put the accelerator on the second letter
                 # ("H&armony"), and "PDF" is fully uppercased.
-                if backend is HarmonyTimeline:
+                if backend.ADD_MENU_TEXT is not None:
+                    text = backend.ADD_MENU_TEXT
+                elif backend is HarmonyTimeline:
                     text = name[0].upper() + "&" + name[1:]
                 elif backend is PdfTimeline:
                     text = "&" + name.upper()

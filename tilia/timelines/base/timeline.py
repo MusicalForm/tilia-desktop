@@ -51,6 +51,10 @@ class Timeline(ABC, Generic[TC]):
     NOT_EXPORTABLE_ATTRS = []
     FLAGS = []
     COMPONENT_MANAGER_CLASS = None
+    # Optional override for the "Add timelines" menu entry's text (with the `&` accelerator).
+    # When None, the text is derived from type_name() (capitalised). Lets a kind whose name is
+    # an acronym (e.g. LCMA) present correctly without the core menu code knowing the kind.
+    ADD_MENU_TEXT: str | None = None
 
     validators = {
         "name": validate_string,

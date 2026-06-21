@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from tilia.ui.color import get_tinted_color
 from tilia.ui.consts import TINT_FACTOR_ON_SELECTION
+from tilia.ui.timelines.copy_paste import CopyAttributes
 from tilia.ui.timelines.hierarchy.element import HierarchyLabel, HierarchyUI
 from tilia.ui.timelines.lcma.context_menu import LcmaFormContextMenu
 from tilia.ui.timelines.lcma.span_view import (
@@ -31,6 +32,14 @@ class LcmaFormUI(HierarchyUI):
     # which no-ops unless the attr is a trigger. Adding "annotation_data" makes a dock edit
     # repaint the rectangle via update_annotation_data().
     UPDATE_TRIGGERS = HierarchyUI.UPDATE_TRIGGERS + ["annotation_data"]
+
+    # Carry annotation_data through copy/paste. HierarchyUI's copy attrs omit it; the hierarchy
+    # copy now reads each element's OWN attrs (get_copy_data_from_hierarchy_ui), and paste skips
+    # attrs the target lacks, so an LCMA->hierarchy paste drops it cleanly.
+    DEFAULT_COPY_ATTRIBUTES = CopyAttributes(
+        values=HierarchyUI.DEFAULT_COPY_ATTRIBUTES.values + ["annotation_data"],
+        context=list(HierarchyUI.DEFAULT_COPY_ATTRIBUTES.context),
+    )
 
     def __init__(self, *args, **kwargs):
         # Parsed-model cache, keyed on the raw JSON-LD string so we only re-parse on change.
