@@ -49,6 +49,7 @@ pytest_plugins = [
     "tests.timelines.pdf.fixtures",
     "tests.timelines.score.fixtures",
     "tests.timelines.range.fixtures",
+    "tests.timelines.lcma.fixtures",
 ]
 
 

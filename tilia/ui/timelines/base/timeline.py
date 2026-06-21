@@ -121,7 +121,16 @@ class TimelineUI(ABC):  # noqa: B024
     def subclasses(cls):
         if not cls.SUBCLASSES_ARE_LOADED:
             cls.ensure_subclasses_are_available()
-        return cls.__subclasses__()
+        # Recursive descent (not just cls.__subclasses__()) so a TimelineUI
+        # defined by subclassing another kind's UI — e.g. an LCMA form UI built
+        # on HierarchyTimelineUI — is discovered too. Pre-order, parents first;
+        # for the existing kinds (all direct children of TimelineUI) this yields
+        # the same list __subclasses__() did.
+        result = []
+        for subclass in cls.__subclasses__():
+            result.append(subclass)
+            result.extend(subclass.subclasses())
+        return result
 
     @classmethod
     def ensure_subclasses_are_available(cls):

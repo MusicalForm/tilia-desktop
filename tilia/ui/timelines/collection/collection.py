@@ -1310,7 +1310,7 @@ class TimelineUIs:
 
         kinds = [
             cls
-            for cls in Timeline.__subclasses__()
+            for cls in Timeline.subclasses()
             if components_are_deletable(cls.FLAGS)
         ]
 

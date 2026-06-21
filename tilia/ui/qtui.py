@@ -276,7 +276,7 @@ class QtUI:
     def _setup_dynamic_menus(self):
         self.kind_to_dynamic_menus = {
             kind: self.menu_bar.get_menu(TimelinesMenu).get_submenu(kind.menu_class)
-            for kind in TimelineUI.__subclasses__()
+            for kind in TimelineUI.subclasses()
             if kind.menu_class
         }
         self.update_dynamic_menus()
@@ -295,7 +295,7 @@ class QtUI:
         # collection knows about backend classes — bridge through
         # `ui_cls.timeline_class` so the comparison is backend-vs-backend.
         instanced_backends = {tlui.timeline_class for tlui in get(Get.TIMELINE_UIS)}
-        for ui_cls in TimelineUI.__subclasses__():
+        for ui_cls in TimelineUI.subclasses():
             if ui_cls.menu_class is None:
                 continue
             if ui_cls.timeline_class in instanced_backends:

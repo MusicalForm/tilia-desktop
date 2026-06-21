@@ -136,7 +136,16 @@ class Timeline(ABC, Generic[TC]):
     def subclasses(cls):
         if not cls.SUBCLASSES_ARE_LOADED:
             cls.ensure_subclasses_are_available()
-        return cls.__subclasses__()
+        # Recursive descent (not just cls.__subclasses__()) so timeline kinds
+        # defined by subclassing another kind — e.g. an LCMA form kind built on
+        # HierarchyTimeline — are discovered too. Pre-order, parents first; for
+        # the existing kinds (all direct children of Timeline) this yields the
+        # same list __subclasses__() did.
+        result = []
+        for subclass in cls.__subclasses__():
+            result.append(subclass)
+            result.extend(subclass.subclasses())
+        return result
 
     @classmethod
     def ensure_subclasses_are_available(cls):
@@ -153,7 +162,7 @@ class Timeline(ABC, Generic[TC]):
     def get_kinds_by_flag(cls, flag: TimelineFlag | list[TimelineFlag]):
         if isinstance(flag, TimelineFlag):
             flag = [flag]
-        return [c for c in cls.__subclasses__() if any(f in c.FLAGS for f in flag)]
+        return [c for c in cls.subclasses() if any(f in c.FLAGS for f in flag)]
 
     @classmethod
     def type_name(cls):
