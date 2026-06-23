@@ -52,6 +52,25 @@ class TestAnnotatedRender:
         assert sv.FUNCTION_ABBR["basic_idea"] in text  # abbreviated function
         assert sv.MAIN_TYPE_ABBR["period"] in text  # abbreviated type
 
+    def test_painted_label_is_the_rich_html_label(self, lcma_form_ui):
+        from tilia.ui.timelines.lcma.element import LcmaFormLabel
+
+        assert isinstance(lcma_form_ui.label, LcmaFormLabel)
+
+    def test_html_label_shows_full_names_at_full_width(self, lcma_form_ui):
+        # The reported bug: a wide unit showed only the abbreviated "fn | type" (e.g. "Core | caaba").
+        # The painted label is now rich HTML with the FULL names at full width.
+        el = lcma_form_ui
+        el.set_data("annotation_data", _jsonld())
+        html = el._display_html(250)
+        assert "Theme A" in html  # name line
+        assert "Basic idea" in html  # full function name (not "bi")
+        assert "Period" in html  # full type name (not "pd")
+        # painting at a wide width drives the rich HTML onto the label (HTML -> plain text),
+        # proving _render_label is wired through to span_html
+        el.update_label(0, 300)
+        assert "Basic idea" in el.label.toPlainText()
+
     def test_tooltip_is_set_from_annotation(self, lcma_form_ui):
         el = lcma_form_ui
         el.set_data("annotation_data", _jsonld())

@@ -477,3 +477,211 @@ class TestNewModelChannels:
         )
         m = sv.parse_span_model(data)
         assert m.attrs == [("harmonicProgression", "my-progression")]
+
+
+# --- material references parsed to a string (material_text) --------------------
+# The timeline shows the specific references as text (not a generic ▦ badge). material_text
+# mirrors revMaterial + the Refs/MaterialChip components: refs joined ", ", each name + its
+# operator symbols, {…} when unordered, transformational as "source ▸ target".
+
+
+def _material_jsonld(material: dict) -> str:
+    return json.dumps(
+        {
+            "forms": [
+                {
+                    "@type": "lcma:Form",
+                    "function": {"hasCategory": "fn:x"},
+                    "material": material,
+                }
+            ]
+        }
+    )
+
+
+class TestMaterialText:
+    def test_operator_maps_loaded_from_vocab(self):
+        # a string-writable operator renders as its symbol; the maps must actually load
+        assert sv.OPERATOR_SYMBOL.get("adaptation") == "°"
+        assert sv.OPERATOR_WRITABLE.get("adaptation") is True
+
+    def test_references_joined_with_operator_symbols(self):
+        m = sv.parse_span_model(
+            _material_jsonld(
+                {
+                    "@type": "lcma:MaterialReferences",
+                    "refs": [
+                        {
+                            "@type": "lcma:Reference",
+                            "ref": "r1",
+                            "operators": ["op:adaptation"],
+                        },
+                        {"@type": "lcma:Reference", "ref": "r2", "operators": []},
+                    ],
+                }
+            )
+        )
+        assert m.flags.material is True
+        assert m.material_text == "r1°, r2"
+
+    def test_unordered_set_is_braced(self):
+        m = sv.parse_span_model(
+            _material_jsonld(
+                {
+                    "@type": "lcma:MaterialReferences",
+                    "unordered": True,
+                    "refs": [
+                        {"ref": "r1", "operators": []},
+                        {"ref": "r2", "operators": []},
+                    ],
+                }
+            )
+        )
+        assert m.material_text == "{r1, r2}"
+
+    def test_sentinel_reference_shows_prev(self):
+        m = sv.parse_span_model(
+            _material_jsonld(
+                {
+                    "@type": "lcma:MaterialReferences",
+                    "refs": [{"ref": sv.SENTINEL, "operators": []}],
+                }
+            )
+        )
+        assert m.material_text == "prev"
+
+    def test_non_writable_operator_is_prettified(self):
+        # augmentation is not string-writable -> its prettified word, not the raw symbol
+        m = sv.parse_span_model(
+            _material_jsonld(
+                {
+                    "@type": "lcma:MaterialReferences",
+                    "refs": [{"ref": "r1", "operators": ["op:augmentation"]}],
+                }
+            )
+        )
+        assert m.material_text == "r1Augmentation"
+
+    def test_transformational_material_is_source_to_target(self):
+        m = sv.parse_span_model(
+            _material_jsonld(
+                {
+                    "@type": "lcma:TransformationalMaterial",
+                    "source": {"refs": [{"ref": "r1", "operators": []}]},
+                    "target": {"refs": [{"ref": "r2", "operators": []}]},
+                }
+            )
+        )
+        assert m.material_text == "r1 ▸ r2"
+
+    def test_transformational_null_side_is_dash(self):
+        m = sv.parse_span_model(
+            _material_jsonld(
+                {
+                    "@type": "lcma:TransformationalMaterial",
+                    "source": None,
+                    "target": {"refs": [{"ref": "r2", "operators": []}]},
+                }
+            )
+        )
+        assert m.material_text == "— ▸ r2"
+
+    def test_no_material_is_empty_string(self):
+        m = sv.parse_span_model(
+            json.dumps(
+                {"forms": [{"@type": "lcma:Form", "function": {"hasCategory": "fn:x"}}]}
+            )
+        )
+        assert m.material_text == ""
+
+
+# --- rich HTML projection (span_html) ------------------------------------------
+# The painted timeline label. Full names at full width (the "Core | caaba" fix), material and
+# attributes as readable strings, weight/size/muted distinction, channels shed by LOD, and every
+# user value HTML-escaped.
+
+
+class TestSpanHtml:
+    def test_full_shows_full_names_not_abbreviations(self):
+        m = sv.parse_span_model(_named_jsonld())
+        out = sv.span_html(m, "full")
+        assert "Theme A" in out  # name line
+        assert "Basic idea" in out  # FULL function name, not "bi"
+        assert "Period" in out  # FULL type name, not "pd"
+
+    def test_full_includes_material_and_attributes_as_strings(self):
+        m = sv.parse_span_model(
+            json.dumps(
+                {
+                    "name": "U",
+                    "forms": [
+                        {
+                            "@type": "lcma:Form",
+                            "function": {"hasCategory": "fn:chorus"},
+                            "material": {
+                                "@type": "lcma:MaterialReferences",
+                                "refs": [{"ref": "r1", "operators": []}],
+                            },
+                        }
+                    ],
+                    "hasAttribute": [
+                        {
+                            "key": {"@id": "lcma:texture"},
+                            "value": "homophonic",
+                        }
+                    ],
+                }
+            )
+        )
+        out = sv.span_html(m, "full")
+        assert "r1" in out  # material reference string
+        assert "texture: homophonic" in out  # attribute string
+
+    def test_provisional_shows_proposed_glyph(self):
+        m = sv.parse_span_model(
+            json.dumps(
+                {
+                    "forms": [
+                        {
+                            "@type": "lcma:Form",
+                            "function": {
+                                "@type": "lcma:Function",
+                                "provisional": True,
+                                "provisionalTerm": "my_fn",
+                            },
+                        }
+                    ]
+                }
+            )
+        )
+        assert "⊕" in sv.span_html(m, "full")
+
+    def test_values_are_html_escaped(self):
+        m = sv.parse_span_model(
+            json.dumps(
+                {
+                    "name": "A & B <x>",
+                    "forms": [
+                        {"@type": "lcma:Form", "function": {"hasCategory": "fn:x"}}
+                    ],
+                }
+            )
+        )
+        out = sv.span_html(m, "full")
+        assert "A &amp; B &lt;x&gt;" in out
+        assert "A & B <x>" not in out
+
+    def test_min_is_empty_and_short_is_abbreviated_single_line(self):
+        m = sv.parse_span_model(_named_jsonld())
+        assert sv.span_html(m, "min") == ""
+        short = sv.span_html(m, "short")
+        assert sv.FUNCTION_ABBR["basic_idea"] in short  # abbreviated headline
+        assert "Basic idea" not in short  # not the full name at short
+        assert "•" in short  # carries more channels (material/attrs/refs)
+
+    def test_med_collapses_extra_channels_to_one_line(self):
+        m = sv.parse_span_model(_named_jsonld())
+        med = sv.span_html(m, "med")
+        assert "Theme A" in med and "Basic idea" in med
+        # material/attrs/refs are present but condensed (the ref string survives)
+        assert "Verse" in med

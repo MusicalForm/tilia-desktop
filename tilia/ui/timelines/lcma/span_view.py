@@ -19,6 +19,7 @@ document is already in compact form, so the keys we read are stable.
 from __future__ import annotations
 
 import colorsys
+import html
 import json
 import re
 from dataclasses import dataclass, field
@@ -117,14 +118,18 @@ def prettify(name: str) -> str:
 _VOCAB_PATH = Path(__file__).parent / "vocab.json"
 
 
-def _load_abbr() -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
-    """Build {name: abbr} maps for functions, main types and placeholders. Returns empty maps on
-    any failure (missing / malformed file), so abbreviation falls back to the prettified term.
-    """
+def _read_vocab() -> dict:
+    """The vendored ontology vocab as a dict, or ``{}`` on any failure (missing / malformed
+    file), so every derived map degrades gracefully to its empty form."""
     try:
-        vocab = json.loads(_VOCAB_PATH.read_text(encoding="utf-8"))
+        return json.loads(_VOCAB_PATH.read_text(encoding="utf-8"))
     except (OSError, ValueError):
-        return {}, {}, {}
+        return {}
+
+
+def _load_abbr(vocab: dict) -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
+    """Build {name: abbr} maps for functions, main types and placeholders. Empty maps when the
+    vocab is missing, so abbreviation falls back to the prettified term."""
 
     def amap(entries) -> dict[str, str]:
         return {e["name"]: e["abbr"] for e in entries if "name" in e and "abbr" in e}
@@ -143,7 +148,22 @@ def _load_abbr() -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
     return function_abbr, type_abbr, placeholder_abbr
 
 
-FUNCTION_ABBR, MAIN_TYPE_ABBR, PLACEHOLDER_ABBR = _load_abbr()
+def _load_operators(vocab: dict) -> tuple[dict[str, str], dict[str, bool]]:
+    """{name: symbol} and {name: string_writable} for material operators, mirroring
+    OPERATOR_SYMBOL / OPERATOR_WRITABLE in vocab.ts. A writable operator renders as its symbol
+    (e.g. ``°``); the rest render as their prettified word. Empty when the vocab is missing."""
+    ops = vocab.get("operators", []) or []
+    symbol = {o["name"]: o["symbol"] for o in ops if "name" in o and "symbol" in o}
+    writable = {o["name"]: bool(o.get("string_writable")) for o in ops if "name" in o}
+    return symbol, writable
+
+
+_VOCAB = _read_vocab()
+FUNCTION_ABBR, MAIN_TYPE_ABBR, PLACEHOLDER_ABBR = _load_abbr(_VOCAB)
+OPERATOR_SYMBOL, OPERATOR_WRITABLE = _load_operators(_VOCAB)
+# The unit-reference sentinel ("previous") — rendered as "prev" in a material reference list,
+# matching the web's Refs component. Falls back to the web's literal default.
+SENTINEL = _VOCAB.get("reference_sentinel", "previous")
 
 
 def _abbr(mapping: dict[str, str], name: str) -> str:
@@ -182,6 +202,9 @@ class SpanModel:
     primary_full: str = "—"  # un-abbreviated, for tooltip / detail
     secondary: str = ""  # formal type: vocab abbreviation
     secondary_full: str = ""
+    material_text: str = (
+        ""  # material references on one line (refs + operators), "" when none
+    )
     color: str = (
         ""  # #rrggbb opaque fill (family hue composited over the track, matches web)
     )
@@ -269,6 +292,44 @@ def _type_provisional(t) -> bool:
     return isinstance(t, dict) and t.get("provisional") is True
 
 
+def _op_text(op_name: str) -> str:
+    """A material operator as its writable symbol or prettified name — the op-pill in LabelChips
+    Refs: writable operators show their symbol, the rest their prettified word."""
+    if OPERATOR_WRITABLE.get(op_name):
+        return OPERATOR_SYMBOL.get(op_name, op_name)
+    return prettify(op_name)
+
+
+def _refs_text(node: dict) -> str:
+    """A ``lcma:MaterialReferences`` node as one line: each reference's name (the SENTINEL shown
+    as ``prev``) followed by its operator symbols, references joined by ``, ``, wrapped in
+    ``{…}`` when the set is unordered. Mirrors revRefs + the Refs component in the web."""
+    parts = []
+    for r in node.get("refs") or []:
+        if not isinstance(r, dict):
+            continue
+        ref = r.get("ref", "")
+        name = "prev" if ref == SENTINEL else ref
+        ops = "".join(_op_text(_local(o)) for o in (r.get("operators") or []))
+        parts.append(f"{name}{ops}")
+    body = ", ".join(parts)
+    return f"{{{body}}}" if node.get("unordered") else body
+
+
+def _material_text(material) -> str:
+    """A material node rendered to one line, or ``""`` when absent. References render as the ref
+    list; a transformational material renders as ``source ▸ target`` (each side the ref list, or
+    ``—`` when that side is empty). Mirrors revMaterial + MaterialChip in the web."""
+    if not isinstance(material, dict):
+        return ""
+    if material.get("@type") == "lcma:TransformationalMaterial":
+        src, tgt = material.get("source"), material.get("target")
+        src_s = _refs_text(src) if isinstance(src, dict) else "—"
+        tgt_s = _refs_text(tgt) if isinstance(tgt, dict) else "—"
+        return f"{src_s} ▸ {tgt_s}"
+    return _refs_text(material)
+
+
 def parse_span_model(jsonld: str) -> SpanModel | None:
     """Project the builder's JSON-LD into a SpanModel. Returns None for empty / unparseable
     input, so the caller can fall back to a plain hierarchy render (unannotated unit).
@@ -314,6 +375,7 @@ def parse_span_model(jsonld: str) -> SpanModel | None:
 
     primary = primary_full = "—"  # em dash
     secondary = secondary_full = ""
+    material_text = ""
     operator = None
     notional = material = uncertain = provisional = False
 
@@ -323,6 +385,7 @@ def parse_span_model(jsonld: str) -> SpanModel | None:
             primary = _abbr(PLACEHOLDER_ABBR, ph_name) or "—"
             primary_full = prettify(ph_name) or "—"
             material = "material" in form
+            material_text = _material_text(form.get("material"))
         else:
             fn = form.get("function") or {}
             primary = _fn_headline(fn, True)
@@ -330,6 +393,7 @@ def parse_span_model(jsonld: str) -> SpanModel | None:
             operator = _fn_operator(fn)
             notional = bool(fn.get("notional"))
             material = "material" in form
+            material_text = _material_text(form.get("material"))
             uncertain = form.get("certainty") == "uncertain"
             ftype = form.get("formalType")
             # A proposed (commit-as-is) function leaf or formal type — flag it so the timeline
@@ -365,6 +429,7 @@ def parse_span_model(jsonld: str) -> SpanModel | None:
         primary_full=primary_full,
         secondary=secondary,
         secondary_full=secondary_full,
+        material_text=material_text,
         color=color,
         flags=flags,
         refs=refs,
@@ -457,3 +522,85 @@ def span_tooltip(m: SpanModel) -> str:
     if m.flags.standalone:
         lines.append("• standalone description")
     return "\n".join(lines)
+
+
+# --- rich HTML projection (the timeline's multi-line LCMA label) ---------------
+# span_html renders a SpanModel as the multi-line, weight/size/muted breakdown the LCMA element
+# paints with QGraphicsTextItem.setHtml — the timeline counterpart of the builder's LabelChips.
+# It is additive: display_label (plain, single line) still backs the tooltip and any plain
+# consumer. Qt's rich-text engine supports inline-styled block/inline tags; every user value is
+# HTML-escaped because names, attribute values and proposed terms are free text.
+
+_HTML_TEXT = "#1a1a1a"  # near-black headline over the pale family fill
+_HTML_MUTED = "#5b6170"  # secondary channels (name, type, material, attributes)
+_HTML_PROV = "#b8860b"  # amber — a proposed (⊕) term, the editor's provisional accent
+
+
+def _esc(value: str) -> str:
+    return html.escape(value or "", quote=False)
+
+
+def _headline_html(m: SpanModel, abbreviate: bool) -> str:
+    """The ``function | type`` headline as HTML: function bold (dark), type muted, with a ⊕
+    (proposed) and ``?`` (uncertain) mark. ``abbreviate`` chooses the vocab abbreviation over the
+    full prettified name (full names at full/med, abbreviations at short)."""
+    fn = m.primary if abbreviate else m.primary_full
+    ty = m.secondary if abbreviate else m.secondary_full
+    parts = [f'<span style="font-weight:bold;color:{_HTML_TEXT}">{_esc(fn)}</span>']
+    if ty:
+        parts.append(f'<span style="color:{_HTML_MUTED}"> | {_esc(ty)}</span>')
+    if m.flags.provisional:
+        parts.append(f'<span style="color:{_HTML_PROV}"> ⊕</span>')
+    if m.flags.uncertain:
+        parts.append(f'<span style="color:{_HTML_MUTED}"> ?</span>')
+    return "".join(parts)
+
+
+def _attrs_refs_text(m: SpanModel) -> str:
+    """Descriptive attributes and cross-unit references as one plain string — ``key: value`` and
+    ``dimension → target (qualifier)`` items joined by ``·``. (Escaped by the caller.)"""
+    bits = [f"{k}: {v}" for k, v in m.attrs]
+    for r in m.refs:
+        tail = f" ({prettify(r.qualifier)})" if r.qualifier else ""
+        bits.append(f"{r.dimension} → {r.target}{tail}")
+    return " · ".join(bits)
+
+
+def span_html(m: SpanModel, lod: Lod) -> str:
+    """The multi-line rich-text label for an LCMA span at a LOD tier, mirroring the builder's
+    LabelChips with weight/size/muted distinction. ``full`` shows every channel on its own line
+    (full names — the fix for a wide unit only showing its abbreviation); ``med`` keeps name +
+    headline + one condensed material/attributes line; ``short`` is a single abbreviated
+    ``fn | type`` (+ ``•`` when more channels exist); ``min`` is empty — the colour fill carries
+    the family. Returns an HTML fragment for ``QGraphicsTextItem.setHtml``."""
+    if lod == "min":
+        return ""
+    if lod == "short":
+        more = bool(m.material_text or m.attrs or m.refs)
+        dot = f'<span style="color:{_HTML_MUTED}"> •</span>' if more else ""
+        return f'<div style="font-size:8pt">{_headline_html(m, True)}{dot}</div>'
+
+    # full / med — full names, multi-line
+    lines = []
+    if m.name:
+        lines.append(
+            f'<div style="font-size:7pt;font-weight:bold;color:{_HTML_MUTED}">'
+            f"{_esc(m.name)}</div>"
+        )
+    lines.append(f'<div style="font-size:9pt">{_headline_html(m, False)}</div>')
+
+    extra = []
+    if m.material_text:
+        extra.append(_esc(m.material_text))
+    attrs_refs = _attrs_refs_text(m)
+    if attrs_refs:
+        extra.append(_esc(attrs_refs))
+
+    if lod == "full":
+        for line in extra:
+            lines.append(f'<div style="font-size:7pt;color:{_HTML_MUTED}">{line}</div>')
+    elif extra:  # med — collapse material + attributes/refs onto one line
+        lines.append(
+            f'<div style="font-size:7pt;color:{_HTML_MUTED}">{" · ".join(extra)}</div>'
+        )
+    return "".join(lines)
