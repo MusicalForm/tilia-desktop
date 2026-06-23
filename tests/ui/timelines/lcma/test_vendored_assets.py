@@ -29,8 +29,11 @@ class TestVendoredEmbed:
 
     def test_has_bridge_and_loader_markers(self):
         html = EMBED_HTML.read_text(encoding="utf-8")
-        assert "loadAnnotation" in html  # Python -> JS entry point (embed.ts)
-        assert "qwebchannel" in html  # the QWebChannel bridge
+        assert "loadAnnotation" in html  # Python -> JS entry point (embed.tsx)
+        # Bridge markers that survive minification (the literal "qwebchannel" identifier does not):
+        # the Qt transport the channel hooks, and the JS -> Py save slot from the contract.
+        assert "webChannelTransport" in html  # QWebChannel transport hook
+        assert "save_annotation" in html  # JS -> Py slot (LcmaBuilderBackend)
         assert "LCMA Annotation Builder" in html  # the embed entry's <title>
 
 

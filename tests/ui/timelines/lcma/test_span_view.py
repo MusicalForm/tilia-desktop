@@ -365,3 +365,115 @@ class TestRobustness:
         )
         m = sv.parse_span_model(data)
         assert m.refs[0].target == "Thème A"
+
+
+# --- new-model channels: cadences, proposed (provisional) terms, multi-valued attrs ----------
+# The structured editor emits these now; the span view must read what reaches the wire so the
+# timeline stays in step with the builder (mirrors the same features in spanView.ts).
+
+
+class TestNewModelChannels:
+    def test_cadence_abbr_loaded_from_its_own_vocab_group(self):
+        # cadences moved to vocab.functions.cadences; their abbreviations must still load
+        assert sv.FUNCTION_ABBR.get("pac") == "PAC"
+        assert sv.FUNCTION_ABBR.get("hc") == "HC"
+
+    def test_provisional_function_headline_flag_and_badge(self):
+        data = json.dumps(
+            {
+                "forms": [
+                    {
+                        "@type": "lcma:Form",
+                        "function": {
+                            "@type": "lcma:Function",
+                            "provisional": True,
+                            "provisionalTerm": "my_new_function",
+                        },
+                    }
+                ]
+            }
+        )
+        m = sv.parse_span_model(data)
+        assert m.flags.provisional is True
+        # proposed term shown verbatim (prettified), not "—"
+        assert m.primary_full == "My new function"
+        assert "⊕" in [b.glyph for b in sv.badges_for(m)]
+        assert "• proposed term (not in the controlled vocabulary)" in sv.span_tooltip(
+            m
+        )
+
+    def test_provisional_leaf_inside_transformation_is_flagged(self):
+        data = json.dumps(
+            {
+                "forms": [
+                    {
+                        "@type": "lcma:Form",
+                        "function": {
+                            "@type": "lcma:FunctionTransformation",
+                            "source": {"provisional": True, "provisionalTerm": "weird"},
+                            "target": {"hasCategory": "fn:transition"},
+                        },
+                    }
+                ]
+            }
+        )
+        m = sv.parse_span_model(data)
+        assert m.flags.provisional is True
+        assert m.flags.operator == "transformation"
+
+    def test_provisional_formal_type_is_flagged_and_shown(self):
+        data = json.dumps(
+            {
+                "forms": [
+                    {
+                        "@type": "lcma:Form",
+                        "function": {"hasCategory": "fn:basic_idea"},
+                        "formalType": {
+                            "@type": "lcma:FormalType",
+                            "provisional": True,
+                            "provisionalTerm": "my_type",
+                        },
+                    }
+                ]
+            }
+        )
+        m = sv.parse_span_model(data)
+        assert m.flags.provisional is True
+        assert m.secondary_full == "My type"
+
+    def test_multi_valued_attribute_is_joined(self):
+        data = json.dumps(
+            {
+                "forms": [{"@type": "lcma:Form", "function": {"hasCategory": "fn:x"}}],
+                "hasAttribute": [
+                    {
+                        "@type": "lcma:AttributeAssignment",
+                        "key": {"@id": "lcma:instrumentation"},
+                        "value": ["bassoon", "cello"],
+                    }
+                ],
+            }
+        )
+        m = sv.parse_span_model(data)
+        assert m.attrs == [("instrumentation", "bassoon, cello")]
+        assert m.flags.attributes == 1
+
+    def test_provisional_attribute_value(self):
+        # a proposed value on a controlled key is a flagged literal carrying its verbatim term
+        data = json.dumps(
+            {
+                "forms": [{"@type": "lcma:Form", "function": {"hasCategory": "fn:x"}}],
+                "hasAttribute": [
+                    {
+                        "@type": "lcma:AttributeAssignment",
+                        "key": {"@id": "lcma:harmonicProgression"},
+                        "value": {
+                            "provisional": True,
+                            "provisionalTerm": "my-progression",
+                        },
+                    }
+                ],
+            }
+        )
+        m = sv.parse_span_model(data)
+        assert m.attrs == [("harmonicProgression", "my-progression")]

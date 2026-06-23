@@ -30,13 +30,6 @@
         ]
       },
       {
-        "name": "cadence",
-        "abbr": "cad.",
-        "aliases": [
-          "cadence"
-        ]
-      },
-      {
         "name": "cadential_subphrase",
         "abbr": "cad",
         "aliases": [
@@ -100,32 +93,10 @@
         ]
       },
       {
-        "name": "deceptive_cadence",
-        "abbr": "DC",
-        "aliases": [
-          "DC",
-          "deceptive"
-        ]
-      },
-      {
         "name": "development_section",
         "abbr": "dev",
         "aliases": [
           "dev"
-        ]
-      },
-      {
-        "name": "essential_expositional_closure",
-        "abbr": "eec",
-        "aliases": [
-          "eec"
-        ]
-      },
-      {
-        "name": "essential_sonata_closure",
-        "abbr": "esc",
-        "aliases": [
-          "esc"
         ]
       },
       {
@@ -140,20 +111,6 @@
         "abbr": "frag",
         "aliases": [
           "frag"
-        ]
-      },
-      {
-        "name": "hc",
-        "abbr": "HC",
-        "aliases": [
-          "HC"
-        ]
-      },
-      {
-        "name": "iac",
-        "abbr": "IAC",
-        "aliases": [
-          "IAC"
         ]
       },
       {
@@ -192,13 +149,6 @@
         ]
       },
       {
-        "name": "medial_caesura",
-        "abbr": "MC",
-        "aliases": [
-          "MC"
-        ]
-      },
-      {
         "name": "model",
         "abbr": "mod",
         "aliases": [
@@ -217,13 +167,6 @@
         "abbr": "out",
         "aliases": [
           "outro"
-        ]
-      },
-      {
-        "name": "pac",
-        "abbr": "PAC",
-        "aliases": [
-          "PAC"
         ]
       },
       {
@@ -315,6 +258,65 @@
         "abbr": "v",
         "aliases": [
           "verse"
+        ]
+      }
+    ],
+    "cadences": [
+      {
+        "name": "cadence",
+        "abbr": "cad.",
+        "aliases": [
+          "cadence"
+        ]
+      },
+      {
+        "name": "deceptive_cadence",
+        "abbr": "DC",
+        "aliases": [
+          "DC",
+          "deceptive"
+        ]
+      },
+      {
+        "name": "essential_expositional_closure",
+        "abbr": "eec",
+        "aliases": [
+          "eec"
+        ]
+      },
+      {
+        "name": "essential_sonata_closure",
+        "abbr": "esc",
+        "aliases": [
+          "esc"
+        ]
+      },
+      {
+        "name": "hc",
+        "abbr": "HC",
+        "aliases": [
+          "HC"
+        ]
+      },
+      {
+        "name": "iac",
+        "abbr": "IAC",
+        "aliases": [
+          "IAC"
+        ]
+      },
+      {
+        "name": "medial_caesura",
+        "abbr": "MC",
+        "aliases": [
+          "MC"
+        ]
+      },
+      {
+        "name": "pac",
+        "abbr": "PAC",
+        "aliases": [
+          "PAC"
         ]
       }
     ],
@@ -924,6 +926,103 @@
           "static",
           "tonicizing"
         ]
+      },
+      {
+        "name": "instrumentation",
+        "aliases": [
+          "instr",
+          "instrumented",
+          "instruments"
+        ],
+        "control": "soft",
+        "range": "Instrument",
+        "values": [
+          {
+            "curie": "lcma:bassoon",
+            "label": "bassoon"
+          },
+          {
+            "curie": "lcma:cello",
+            "label": "cello"
+          },
+          {
+            "curie": "lcma:clarinet",
+            "label": "clarinet"
+          },
+          {
+            "curie": "lcma:double_bass",
+            "label": "double bass"
+          },
+          {
+            "curie": "lcma:flute",
+            "label": "flute"
+          },
+          {
+            "curie": "lcma:guitar",
+            "label": "guitar"
+          },
+          {
+            "curie": "lcma:harp",
+            "label": "harp"
+          },
+          {
+            "curie": "lcma:harpsichord",
+            "label": "harpsichord"
+          },
+          {
+            "curie": "lcma:horn",
+            "label": "horn"
+          },
+          {
+            "curie": "lcma:oboe",
+            "label": "oboe"
+          },
+          {
+            "curie": "lcma:organ",
+            "label": "organ"
+          },
+          {
+            "curie": "lcma:percussion",
+            "label": "percussion"
+          },
+          {
+            "curie": "lcma:piano",
+            "label": "piano"
+          },
+          {
+            "curie": "lcma:saxophone",
+            "label": "saxophone"
+          },
+          {
+            "curie": "lcma:timpani",
+            "label": "timpani"
+          },
+          {
+            "curie": "lcma:trombone",
+            "label": "trombone"
+          },
+          {
+            "curie": "lcma:trumpet",
+            "label": "trumpet"
+          },
+          {
+            "curie": "lcma:tuba",
+            "label": "tuba"
+          },
+          {
+            "curie": "lcma:viola",
+            "label": "viola"
+          },
+          {
+            "curie": "lcma:violin",
+            "label": "violin"
+          },
+          {
+            "curie": "lcma:voice",
+            "label": "voice"
+          }
+        ],
+        "multiValued": true
       },
       {
         "name": "mode",

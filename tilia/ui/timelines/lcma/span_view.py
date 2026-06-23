@@ -130,11 +130,13 @@ def _load_abbr() -> tuple[dict[str, str], dict[str, str], dict[str, str]]:
         return {e["name"]: e["abbr"] for e in entries if "name" in e and "abbr" in e}
 
     fns = vocab.get("functions", {})
-    # specific first, then generic_units — generic wins on the lone name collision, matching the
-    # web's FUNCTION_ABBR construction order.
+    # specific, then generic_units, then cadences — last wins on a name collision, matching the
+    # web's FUNCTION_ABBR construction order (vocab.ts). Cadences are a first-class function group
+    # now (vocab.json functions.cadences); include them so a cadence headline still abbreviates.
     function_abbr = {
         **amap(fns.get("specific", [])),
         **amap(fns.get("generic_units", [])),
+        **amap(fns.get("cadences", [])),
     }
     type_abbr = amap(vocab.get("types", {}).get("main", []))
     placeholder_abbr = amap(vocab.get("placeholders", []))
@@ -160,6 +162,9 @@ class SpanFlags:
     attributes: int = 0  # count of literal descriptive keys
     references: int = 0  # count of unit-reference targets
     uncertain: bool = False
+    provisional: bool = (
+        False  # a PROPOSED term (commit-as-is), not in the controlled vocabulary
+    )
     standalone: bool = False  # attribute-only label (no forms)
 
 
@@ -189,7 +194,7 @@ class SpanModel:
 class Badge:
     glyph: str
     title: str
-    kind: str  # "op" | "mat" | "attr" | "ref" | "unc"
+    kind: str  # "op" | "mat" | "attr" | "ref" | "unc" | "prov"
 
 
 # --- JSON-LD reading (mirrors the reverse helpers in jsonld.ts) ----------------
@@ -209,9 +214,12 @@ def _qualifier_term(q):
 
 
 def _value_term(v) -> str:
-    # A controlled value is an {@id} node ref; MVP shows its local name (the web maps the
-    # CURIE to a vocab label). A soft/free value is a plain literal.
+    # A controlled value is an {@id} node ref (shown as its local name; the web maps the CURIE to a
+    # vocab label). A PROPOSED value is a flagged literal carrying its verbatim term. A soft/free
+    # value is a plain literal.
     if isinstance(v, dict):
+        if v.get("provisional") is True:
+            return v.get("provisionalTerm", "")
         return _local(v.get("@id", ""))
     return v if v is not None else ""
 
@@ -222,14 +230,19 @@ def _unit_name(iri: str) -> str:
 
 def _fn_headline(fn: dict, abbreviate: bool) -> str:
     """A function node rendered to one line: a transformation as ``a→b``, else the function
-    category (abbreviated via the vocab, or prettified in full), quoted when notional.
+    category (abbreviated via the vocab, or prettified in full), quoted when notional. A PROVISIONAL
+    (proposed) leaf carries its verbatim term under ``provisionalTerm`` instead of a CURIE.
     """
     if fn.get("@type") == "lcma:FunctionTransformation":
         return (
             f"{_fn_headline(fn.get('source') or {}, abbreviate)}→"
             f"{_fn_headline(fn.get('target') or {}, abbreviate)}"
         )
-    name = _local(fn.get("hasCategory", ""))
+    name = (
+        fn.get("provisionalTerm", "")
+        if fn.get("provisional") is True
+        else _local(fn.get("hasCategory", ""))
+    )
     base = (_abbr(FUNCTION_ABBR, name) if abbreviate else prettify(name)) or "—"
     return f"“{base}”" if fn.get("notional") else base
 
@@ -238,6 +251,22 @@ def _fn_operator(fn: dict) -> str | None:
     if fn.get("@type") == "lcma:FunctionTransformation" or "source" in fn:
         return "transformation"
     return None  # fusion is not yet serialised into JSON-LD
+
+
+def _fn_provisional(fn) -> bool:
+    """True when a function node carries a PROVISIONAL (proposed, not-in-vocab) leaf — a bare
+    provisional leaf or one inside a transformation's source/target. Mirrors fnProvisional in
+    spanView.ts, restricted to what reaches the wire (operator trees are not serialised)."""
+    if not isinstance(fn, dict):
+        return False
+    if fn.get("provisional") is True:
+        return True
+    return _fn_provisional(fn.get("source")) or _fn_provisional(fn.get("target"))
+
+
+def _type_provisional(t) -> bool:
+    """True when a formal-type node carries the PROVISIONAL (proposed) flag."""
+    return isinstance(t, dict) and t.get("provisional") is True
 
 
 def parse_span_model(jsonld: str) -> SpanModel | None:
@@ -270,7 +299,13 @@ def parse_span_model(jsonld: str) -> SpanModel | None:
                     )
                 )
         else:
-            attrs.append((key, _value_term(a.get("value"))))
+            value = a.get("value")
+            if isinstance(value, list):
+                # A multi-valued key (instrumentation) is a SET of values — join the per-element
+                # terms, mirroring the web's value.values.join(", ").
+                attrs.append((key, ", ".join(_value_term(v) for v in value)))
+            else:
+                attrs.append((key, _value_term(value)))
 
     forms = node.get("forms") or []
     standalone = len(forms) == 0
@@ -280,7 +315,7 @@ def parse_span_model(jsonld: str) -> SpanModel | None:
     primary = primary_full = "—"  # em dash
     secondary = secondary_full = ""
     operator = None
-    notional = material = uncertain = False
+    notional = material = uncertain = provisional = False
 
     if isinstance(form, dict):
         if form.get("@type") == "lcma:Placeholder":
@@ -297,8 +332,15 @@ def parse_span_model(jsonld: str) -> SpanModel | None:
             material = "material" in form
             uncertain = form.get("certainty") == "uncertain"
             ftype = form.get("formalType")
+            # A proposed (commit-as-is) function leaf or formal type — flag it so the timeline
+            # marks it ⊕, the same channel the reference editor's LEGEND shows.
+            provisional = _fn_provisional(fn) or _type_provisional(ftype)
             if isinstance(ftype, dict):
-                main = _local(ftype.get("hasCategory", ""))
+                main = (
+                    ftype.get("provisionalTerm", "")
+                    if ftype.get("provisional") is True
+                    else _local(ftype.get("hasCategory", ""))
+                )
                 secondary = _abbr(MAIN_TYPE_ABBR, main)
                 secondary_full = prettify(main)
     elif standalone and name:
@@ -313,6 +355,7 @@ def parse_span_model(jsonld: str) -> SpanModel | None:
         attributes=len(attrs),
         references=len(refs),
         uncertain=uncertain,
+        provisional=provisional,
         standalone=standalone,
     )
     color = span_fill_hex(primary_full, standalone)
@@ -369,6 +412,8 @@ def badges_for(m: SpanModel) -> list[Badge]:
         b.append(Badge("↗", f"references {targets}", "ref"))  # ↗
     if m.flags.uncertain:
         b.append(Badge("?", "uncertain", "unc"))
+    if m.flags.provisional:
+        b.append(Badge("⊕", "proposed term — not in the controlled vocabulary", "prov"))
     return b
 
 
@@ -405,6 +450,8 @@ def span_tooltip(m: SpanModel) -> str:
     for r in m.refs:
         tail = f" ({prettify(r.qualifier)})" if r.qualifier else ""
         lines.append(f"• {r.dimension} → {r.target}{tail}")
+    if m.flags.provisional:
+        lines.append("• proposed term (not in the controlled vocabulary)")
     if m.flags.uncertain:
         lines.append("• uncertain")
     if m.flags.standalone:
