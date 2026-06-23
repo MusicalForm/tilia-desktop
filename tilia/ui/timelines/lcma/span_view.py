@@ -202,6 +202,7 @@ class SpanModel:
     primary_full: str = "—"  # un-abbreviated, for tooltip / detail
     secondary: str = ""  # formal type: vocab abbreviation
     secondary_full: str = ""
+    secondary_sub: str = ""  # formal SUBtype, prettified ("" when none)
     material_text: str = (
         ""  # material references on one line (refs + operators), "" when none
     )
@@ -374,7 +375,7 @@ def parse_span_model(jsonld: str) -> SpanModel | None:
     name = node.get("name") or ""
 
     primary = primary_full = "—"  # em dash
-    secondary = secondary_full = ""
+    secondary = secondary_full = secondary_sub = ""
     material_text = ""
     operator = None
     notional = material = uncertain = provisional = False
@@ -407,6 +408,15 @@ def parse_span_model(jsonld: str) -> SpanModel | None:
                 )
                 secondary = _abbr(MAIN_TYPE_ABBR, main)
                 secondary_full = prettify(main)
+                # A formal SUBtype (typeNode emits sub as the CURIE "type:<name>"); shown with a
+                # typographic accent after the main type, mirroring the web's "· sub" chip-sub.
+                sub = ftype.get("sub")
+                if sub:
+                    secondary_sub = prettify(
+                        _local(sub)
+                        if isinstance(sub, str)
+                        else _local(sub.get("@id", ""))
+                    )
     elif standalone and name:
         primary = primary_full = prettify(name)
     elif standalone:
@@ -429,6 +439,7 @@ def parse_span_model(jsonld: str) -> SpanModel | None:
         primary_full=primary_full,
         secondary=secondary,
         secondary_full=secondary_full,
+        secondary_sub=secondary_sub,
         material_text=material_text,
         color=color,
         flags=flags,
@@ -443,13 +454,18 @@ Lod = str  # "full" | "med" | "short" | "min"
 
 
 def lod_for(px_width: float) -> Lod:
-    """The detail tier a span at this pixel width can legibly show. As a span narrows,
-    channels are shed in priority order rather than crammed and clipped."""
-    if px_width >= 200:
+    """The detail tier a span at this pixel width can legibly show. As a span narrows, channels
+    are shed in priority order rather than crammed and clipped.
+
+    These thresholds are tuned for the multi-line, wrapping HTML label (span_html) in tall LCMA
+    bands — NOT a single clipped line — so they are far lower than a one-line label would need:
+    a ~70px unit wraps its full names over a few lines comfortably, where a single line would
+    have to abbreviate. Shedding still happens, just much later."""
+    if px_width >= 140:
         return "full"
-    if px_width >= 104:
+    if px_width >= 64:
         return "med"
-    if px_width >= 48:
+    if px_width >= 32:
         return "short"
     return "min"
 
@@ -503,7 +519,8 @@ def span_tooltip(m: SpanModel) -> str:
     """A full plain-text breakdown of every channel, one per line, for the span's hover
     tooltip — so what the badges only hint at stays legible at any zoom."""
     head = f"{m.name} — {m.primary_full}" if m.name else m.primary_full
-    lines = [f"{head}  |  {m.secondary_full}" if m.secondary_full else head]
+    type_text = m.secondary_full + (f" · {m.secondary_sub}" if m.secondary_sub else "")
+    lines = [f"{head}  |  {type_text}" if type_text else head]
     if m.flags.operator:
         lines.append(f"• {m.flags.operator}")
     if m.flags.notional:
@@ -549,6 +566,12 @@ def _headline_html(m: SpanModel, abbreviate: bool) -> str:
     parts = [f'<span style="font-weight:bold;color:{_HTML_TEXT}">{_esc(fn)}</span>']
     if ty:
         parts.append(f'<span style="color:{_HTML_MUTED}"> | {_esc(ty)}</span>')
+    # The subtype gets its own typographic accent (italic) so it reads as a refinement of the
+    # type, not a third peer channel. Full names only — short drops it for room.
+    if not abbreviate and m.secondary_sub:
+        parts.append(
+            f'<span style="color:{_HTML_MUTED};font-style:italic"> · {_esc(m.secondary_sub)}</span>'
+        )
     if m.flags.provisional:
         parts.append(f'<span style="color:{_HTML_PROV}"> ⊕</span>')
     if m.flags.uncertain:

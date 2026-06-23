@@ -65,12 +65,14 @@ class TestPrettifyAndLod:
         assert sv._abbr(sv.FUNCTION_ABBR, "not_a_real_term") == "Not a real term"
 
     def test_lod_thresholds(self):
-        assert sv.lod_for(200) == "full"
-        assert sv.lod_for(199) == "med"
-        assert sv.lod_for(104) == "med"
-        assert sv.lod_for(103) == "short"
-        assert sv.lod_for(48) == "short"
-        assert sv.lod_for(47) == "min"
+        # Tuned for the multi-line wrapping label in tall bands — far lower than a single-line
+        # label needs, so a ~70px unit shows full names (wrapped) instead of folding to an abbr.
+        assert sv.lod_for(140) == "full"
+        assert sv.lod_for(139) == "med"
+        assert sv.lod_for(64) == "med"
+        assert sv.lod_for(63) == "short"
+        assert sv.lod_for(32) == "short"
+        assert sv.lod_for(31) == "min"
         assert sv.lod_for(0) == "min"
 
 
@@ -146,6 +148,31 @@ class TestParse:
         assert m.refs == [sv.SpanRef("harmony", "Verse", "louder_than")]
         assert m.flags.attributes == 1
         assert m.flags.references == 1
+
+    def test_formal_subtype_is_parsed(self):
+        # typeNode emits the subtype as the CURIE "type:<name>" under `sub`
+        data = json.dumps(
+            {
+                "forms": [
+                    {
+                        "@type": "lcma:Form",
+                        "function": {"hasCategory": "fn:basic_idea"},
+                        "formalType": {
+                            "@type": "lcma:FormalType",
+                            "hasCategory": "type:period",
+                            "sub": "type:parallel",
+                        },
+                    }
+                ]
+            }
+        )
+        m = sv.parse_span_model(data)
+        assert m.secondary_full == "Period"
+        assert m.secondary_sub == "Parallel"
+
+    def test_no_subtype_leaves_secondary_sub_empty(self):
+        m = sv.parse_span_model(_named_jsonld())
+        assert m.secondary_sub == ""
 
     def test_transformation_headline_and_operator(self):
         data = json.dumps(
@@ -678,6 +705,31 @@ class TestSpanHtml:
         assert sv.FUNCTION_ABBR["basic_idea"] in short  # abbreviated headline
         assert "Basic idea" not in short  # not the full name at short
         assert "•" in short  # carries more channels (material/attrs/refs)
+
+    def test_subtype_rendered_with_typographic_accent(self):
+        m = sv.parse_span_model(
+            json.dumps(
+                {
+                    "forms": [
+                        {
+                            "@type": "lcma:Form",
+                            "function": {"hasCategory": "fn:basic_idea"},
+                            "formalType": {
+                                "@type": "lcma:FormalType",
+                                "hasCategory": "type:period",
+                                "sub": "type:parallel",
+                            },
+                        }
+                    ]
+                }
+            )
+        )
+        out = sv.span_html(m, "full")
+        assert "Period" in out
+        assert "Parallel" in out  # the subtype is shown
+        assert "font-style:italic" in out  # ...with a typographic distinction
+        # short drops the subtype for room (abbreviated headline only)
+        assert "Parallel" not in sv.span_html(m, "short")
 
     def test_med_collapses_extra_channels_to_one_line(self):
         m = sv.parse_span_model(_named_jsonld())

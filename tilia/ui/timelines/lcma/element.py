@@ -54,7 +54,9 @@ class LcmaFormUI(HierarchyUI):
     # backed) hierarchy heights and are read by LcmaFormBody.get_rect / LcmaFormLabel.get_point
     # below, so the taller bands are confined to LCMA timelines — plain hierarchies are untouched.
     # frame_handle_y already calls self.base_height(), so the frame handles follow automatically.
-    LCMA_BASE_HEIGHT = 28
+    # base_height is the level-1 band height — generous so a wrapped level-1 label clears the
+    # timeline's bottom edge with a comfortable margin (the label hangs from the band top).
+    LCMA_BASE_HEIGHT = 56
     LCMA_LEVEL_HEIGHT_DIFF = 60
 
     @staticmethod
