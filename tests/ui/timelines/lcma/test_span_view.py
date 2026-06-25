@@ -731,6 +731,37 @@ class TestSpanHtml:
         # short drops the subtype for room (abbreviated headline only)
         assert "Parallel" not in sv.span_html(m, "short")
 
+    def test_type_restating_the_function_collapses_to_its_subtype(self):
+        # function "intro" + a proposed type "intro" subtyped "accumulative" -> "Intro · accumulative"
+        # (the redundant main type is dropped), NOT "Intro | Intro · accumulative".
+        m = sv.parse_span_model(
+            json.dumps(
+                {
+                    "forms": [
+                        {
+                            "@type": "lcma:Form",
+                            "function": {"hasCategory": "fn:intro"},
+                            "formalType": {
+                                "@type": "lcma:FormalType",
+                                "provisional": True,
+                                "provisionalTerm": "intro",
+                                "sub": "type:accumulative",
+                            },
+                        }
+                    ]
+                }
+            )
+        )
+        assert m.secondary_full == "Intro" and m.secondary_sub == "Accumulative"
+        out = sv.span_html(m, "full")
+        assert "Accumulative" in out
+        assert (
+            "| Intro" not in out
+        )  # the restated main type is not shown as a peer channel
+        # tooltip likewise shows the subtype, not the doubled main
+        tip = sv.span_tooltip(m)
+        assert "Accumulative" in tip and "Intro | Intro" not in tip
+
     def test_med_collapses_extra_channels_to_one_line(self):
         m = sv.parse_span_model(_named_jsonld())
         med = sv.span_html(m, "med")

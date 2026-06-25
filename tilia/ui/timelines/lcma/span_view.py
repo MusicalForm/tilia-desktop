@@ -519,7 +519,15 @@ def span_tooltip(m: SpanModel) -> str:
     """A full plain-text breakdown of every channel, one per line, for the span's hover
     tooltip — so what the badges only hint at stays legible at any zoom."""
     head = f"{m.name} — {m.primary_full}" if m.name else m.primary_full
-    type_text = m.secondary_full + (f" · {m.secondary_sub}" if m.secondary_sub else "")
+    type_parts = []
+    # Drop a type-main that just restates the function (see _headline_html), keep its subtype.
+    if m.secondary_full and not (
+        m.secondary_sub and m.secondary_full.lower() == m.primary_full.lower()
+    ):
+        type_parts.append(m.secondary_full)
+    if m.secondary_sub:
+        type_parts.append(m.secondary_sub)
+    type_text = " · ".join(type_parts)
     lines = [f"{head}  |  {type_text}" if type_text else head]
     if m.flags.operator:
         lines.append(f"• {m.flags.operator}")
@@ -563,6 +571,11 @@ def _headline_html(m: SpanModel, abbreviate: bool) -> str:
     full prettified name (full names at full/med, abbreviations at short)."""
     fn = m.primary if abbreviate else m.primary_full
     ty = m.secondary if abbreviate else m.secondary_full
+    # A formal type that merely restates the function (same word) carries no information beyond a
+    # subtype it may refine — drop it so "intro" + type "intro·accumulative" reads "Intro ·
+    # accumulative", not "Intro | Intro · accumulative".
+    if ty and m.secondary_sub and ty.lower() == fn.lower():
+        ty = ""
     parts = [f'<span style="font-weight:bold;color:{_HTML_TEXT}">{_esc(fn)}</span>']
     if ty:
         parts.append(f'<span style="color:{_HTML_MUTED}"> | {_esc(ty)}</span>')
