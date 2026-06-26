@@ -23,6 +23,13 @@
         ]
       },
       {
+        "name": "before_the_beginning",
+        "abbr": "btb",
+        "aliases": [
+          "btb"
+        ]
+      },
+      {
         "name": "bridge",
         "abbr": "br",
         "aliases": [
@@ -177,6 +184,14 @@
         ]
       },
       {
+        "name": "prechorus",
+        "abbr": "pch",
+        "aliases": [
+          "pre-chorus",
+          "prechorus"
+        ]
+      },
+      {
         "name": "presentation",
         "abbr": "pres",
         "aliases": [
@@ -244,6 +259,13 @@
         "abbr": "so",
         "aliases": [
           "solo"
+        ]
+      },
+      {
+        "name": "thematic_introduction",
+        "abbr": "ti",
+        "aliases": [
+          "ti"
         ]
       },
       {
@@ -328,8 +350,10 @@
       },
       {
         "name": "cycle",
-        "abbr": "cycle",
-        "aliases": []
+        "abbr": "cy",
+        "aliases": [
+          "cycle"
+        ]
       },
       {
         "name": "group",
