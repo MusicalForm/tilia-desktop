@@ -81,3 +81,47 @@ class TestDockSaveRepaintsElement:
             assert sv.FUNCTION_ABBR["chorus"] in el._display_text(250)
         finally:
             dock.deleteLater()
+
+
+class TestBuilderHeader:
+    """The dock's header mirrors the bound unit's read-only start/end and its comments, stays live
+    on a data change (e.g. a handle drag re-reads start/end), and blanks when the unit is cleared.
+    """
+
+    def _dock(self):
+        from tilia.ui.timelines.lcma.builder_dock import LcmaBuilderDock
+
+        return LcmaBuilderDock()
+
+    def test_load_populates_start_end_and_comments(self, lcma_tl, lcma_tlui, lcma_form):
+        el = lcma_tlui.get_element(lcma_form.id)
+        lcma_tlui.timeline.set_component_data(lcma_form.id, "comments", "hello")
+        dock = self._dock()
+        try:
+            dock.load_annotation(lcma_tl.id, lcma_form.id, "")
+            assert (
+                dock._start_end_label.text() == el.get_inspector_dict()["Start / end"]
+            )
+            assert dock._comments_edit.toPlainText() == "hello"
+        finally:
+            dock.deleteLater()
+
+    def test_data_change_refreshes_header(self, lcma_tl, lcma_tlui, lcma_form):
+        dock = self._dock()
+        try:
+            dock.load_annotation(lcma_tl.id, lcma_form.id, "")
+            # a write to the bound unit (what a handle drag does to start/end) refreshes the header
+            lcma_tlui.timeline.set_component_data(lcma_form.id, "comments", "world")
+            assert dock._comments_edit.toPlainText() == "world"
+        finally:
+            dock.deleteLater()
+
+    def test_clear_blanks_header(self, lcma_tl, lcma_tlui, lcma_form):
+        dock = self._dock()
+        try:
+            dock.load_annotation(lcma_tl.id, lcma_form.id, "")
+            dock.clear_annotation(lcma_form.id)
+            assert dock._start_end_label.text() == "—"
+            assert dock._comments_edit.toPlainText() == ""
+        finally:
+            dock.deleteLater()

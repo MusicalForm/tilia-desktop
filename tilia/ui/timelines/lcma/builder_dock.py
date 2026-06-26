@@ -7,10 +7,19 @@ from PySide6.QtCore import QObject, Qt, QUrl, Slot
 from PySide6.QtWebChannel import QWebChannel
 from PySide6.QtWebEngineCore import QWebEngineSettings
 from PySide6.QtWebEngineWidgets import QWebEngineView
+from PySide6.QtWidgets import QFormLayout, QLabel, QTextEdit, QVBoxLayout, QWidget
 
 from tilia.exceptions import NoReplyToRequest
 from tilia.log import logger
-from tilia.requests import Get, get, serve, stop_serving_all
+from tilia.requests import (
+    Get,
+    Post,
+    get,
+    listen,
+    serve,
+    stop_listening_to_all,
+    stop_serving_all,
+)
 from tilia.ui.timelines.lcma.builder_io import set_annotation_data
 from tilia.ui.windows.view_window import ViewDockWidget
 
@@ -73,7 +82,15 @@ class LcmaBuilderDock(ViewDockWidget):
         self._last_value: str | None = None
 
         self._setup_web_engine()
+        self._setup_ui()
         serve(self, Get.LCMA_BUILDER, lambda: self)
+        # Keep the header's start/end live: a handle drag (or any edit) on the bound unit posts
+        # TIMELINE_COMPONENT_SET_DATA_DONE, which re-reads the inspector values.
+        listen(
+            self,
+            Post.TIMELINE_COMPONENT_SET_DATA_DONE,
+            self.on_component_set_data_done,
+        )
 
         main_window = get(Get.MAIN_WINDOW)
         self.setParent(main_window)
@@ -89,7 +106,33 @@ class LcmaBuilderDock(ViewDockWidget):
         self.channel.registerObject("backend", self.backend)
         self.view.page().setWebChannel(self.channel)
         self.view.load(QUrl.fromLocalFile(str(EMBED_HTML.resolve())))
-        self.setWidget(self.view)
+
+    def _setup_ui(self):
+        # The bound unit's temporal bounds + comments sit in a header above the builder, so the
+        # whole unit is edited in one pane (LCMA units opt out of the shared Inspector). Start/end
+        # are read-only here — they're set by dragging the unit's handles. Comments are read-only
+        # in this step; the editable write-back lands next.
+        self._start_end_label = QLabel("—")
+        self._start_end_label.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        self._comments_edit = QTextEdit()
+        self._comments_edit.setAcceptRichText(False)
+        self._comments_edit.setReadOnly(True)
+        self._comments_edit.setMaximumHeight(80)
+
+        form = QFormLayout()
+        form.addRow("Start / end", self._start_end_label)
+        form.addRow("Comments", self._comments_edit)
+        header = QWidget()
+        header.setLayout(form)
+
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(header)
+        layout.addWidget(self.view, stretch=1)
+        self.setWidget(container)
 
     # --- bridge callbacks (called from the QWebChannel backend) ---
 
@@ -119,6 +162,7 @@ class LcmaBuilderDock(ViewDockWidget):
         self._last_value = jsonld
         if not self.isVisible():
             self.show()
+        self._refresh_header()
         self._push_or_queue(jsonld)
 
     def clear_annotation(self, component_id: int):
@@ -129,7 +173,33 @@ class LcmaBuilderDock(ViewDockWidget):
         self._tl_id = None
         self._cmp_id = None
         self._last_value = ""
+        self._refresh_header()  # ids now None -> blanks the header
         self._push_or_queue("")  # empty -> the builder shows a blank label
+
+    # --- header (start/end + comments for the bound unit) ---
+
+    def on_component_set_data_done(self, timeline_id, component_id, *_):
+        if timeline_id == self._tl_id and component_id == self._cmp_id:
+            self._refresh_header()
+
+    def _refresh_header(self):
+        if self._tl_id is None or self._cmp_id is None:
+            self._start_end_label.setText("—")
+            self._set_comments_text("")
+            return
+        try:
+            element = get(Get.TIMELINE_UI_ELEMENT, self._tl_id, self._cmp_id)
+        except NoReplyToRequest:
+            return
+        if element is None:
+            return
+        fields = element.get_inspector_dict()
+        self._start_end_label.setText(fields.get("Start / end") or "—")
+        self._set_comments_text(fields.get("Comments") or "")
+
+    def _set_comments_text(self, text: str):
+        if self._comments_edit.toPlainText() != text:
+            self._comments_edit.setPlainText(text)
 
     # --- internals ---
 
@@ -143,6 +213,7 @@ class LcmaBuilderDock(ViewDockWidget):
         self.view.page().runJavaScript(f"loadAnnotation({json.dumps(jsonld)})")
 
     def deleteLater(self):
+        stop_listening_to_all(self)
         stop_serving_all(self)
         super().deleteLater()
 
