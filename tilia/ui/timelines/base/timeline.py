@@ -467,7 +467,8 @@ class TimelineUI(ABC):  # noqa: B024
         if hasattr(element, "INSPECTOR_FIELDS") and success:
             stop_listening(element, Post.INSPECTOR_FIELD_EDITED)
 
-            post(Post.INSPECTABLE_ELEMENT_DESELECTED, element.id)
+            if getattr(element, "INSPECTABLE", True):
+                post(Post.INSPECTABLE_ELEMENT_DESELECTED, element.id)
 
         return success
 
@@ -505,6 +506,12 @@ class TimelineUI(ABC):  # noqa: B024
 
     @staticmethod
     def post_inspectable_selected_event(element):
+        if not getattr(element, "INSPECTABLE", True):
+            # Element opts out of the shared Inspector (it has its own editor). The
+            # INSPECTOR_FIELD_EDITED listen in select_element stays, so that editor can
+            # still drive edits through the validated path.
+            return
+
         if not hasattr(element, "INSPECTOR_FIELDS") or not hasattr(
             element, "get_inspector_dict"
         ):

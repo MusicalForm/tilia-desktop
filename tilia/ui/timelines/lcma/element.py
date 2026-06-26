@@ -35,6 +35,11 @@ class LcmaFormUI(HierarchyUI):
     """
 
     CONTEXT_MENU_CLASS = LcmaFormContextMenu
+    # LCMA units are edited in the builder dock, not the shared Inspector — opt out so selecting
+    # a unit doesn't also raise/populate the generic Inspector. The INSPECTOR_FIELD_EDITED route
+    # stays live (base.select_element still listens), so the builder dock can drive start/end/
+    # comments through the same validated path.
+    INSPECTABLE = False
     # The lynchpin for live feedback: a builder-dock save flows
     # set_component_data -> TIMELINE_COMPONENT_SET_DATA_DONE -> element.update(attr, value),
     # which no-ops unless the attr is a trigger. Adding "annotation_data" makes a dock edit

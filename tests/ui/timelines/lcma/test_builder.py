@@ -7,6 +7,7 @@ annotation-ui repo and by manual in-app verification; here we cover the Python
 logic around it without constructing a webview.
 """
 
+from tests.mock import PatchPost
 from tilia.requests import Post, listen, stop_listening_to_all
 from tilia.ui.timelines.lcma import builder_io
 
@@ -89,3 +90,72 @@ class TestSelectionWiring:
         lcma_tlui.deselect_element(ui)
 
         assert fake.cleared == [lcma_form.id]
+
+
+class TestInspectorSuppression:
+    """LCMA units carry their own editor (the builder dock), so they opt out of the shared
+    Inspector: selecting one must not fire INSPECTABLE_ELEMENT_SELECTED and deselecting must not
+    fire INSPECTABLE_ELEMENT_DESELECTED. The INSPECTOR_FIELD_EDITED listen is untouched (the
+    builder dock reuses it), and plain hierarchies stay inspectable.
+    """
+
+    _TIMELINE_MODULE = "tilia.ui.timelines.base.timeline"
+
+    def test_lcma_opts_out_but_hierarchy_does_not(self):
+        from tilia.ui.timelines.hierarchy.element import HierarchyUI
+        from tilia.ui.timelines.lcma.element import LcmaFormUI
+
+        assert LcmaFormUI.INSPECTABLE is False
+        # regression guard: only LCMA opts out; plain hierarchies stay inspectable
+        assert HierarchyUI.INSPECTABLE is True
+
+    def test_select_does_not_post_inspectable_selected(
+        self, lcma_tlui, lcma_form, monkeypatch
+    ):
+        import tilia.ui.timelines.lcma.builder_dock as bd
+
+        monkeypatch.setattr(bd, "get_or_create_builder_dock", lambda: _FakeDock())
+        ui = lcma_tlui.get_element(lcma_form.id)
+
+        with PatchPost(
+            self._TIMELINE_MODULE, Post.INSPECTABLE_ELEMENT_SELECTED
+        ) as mock:
+            lcma_tlui.select_element(ui)
+
+        mock.assert_not_called()
+
+    def test_deselect_does_not_post_inspectable_deselected(
+        self, lcma_tlui, lcma_form, monkeypatch
+    ):
+        import tilia.ui.timelines.lcma.builder_dock as bd
+
+        fake = _FakeDock()
+        monkeypatch.setattr(bd, "get_or_create_builder_dock", lambda: fake)
+        monkeypatch.setattr(bd, "get_builder_dock_if_exists", lambda: fake)
+        ui = lcma_tlui.get_element(lcma_form.id)
+        lcma_tlui.select_element(ui)
+
+        with PatchPost(
+            self._TIMELINE_MODULE, Post.INSPECTABLE_ELEMENT_DESELECTED
+        ) as mock:
+            lcma_tlui.deselect_element(ui)
+
+        mock.assert_not_called()
+
+    def test_positive_control_inspectable_element_posts(
+        self, lcma_tlui, lcma_form, monkeypatch
+    ):
+        # Flip the opt-out off on this instance: the same select path must now post, proving the
+        # suppression is the INSPECTABLE gate (not a broken spy) and the post still works.
+        import tilia.ui.timelines.lcma.builder_dock as bd
+
+        monkeypatch.setattr(bd, "get_or_create_builder_dock", lambda: _FakeDock())
+        ui = lcma_tlui.get_element(lcma_form.id)
+        monkeypatch.setattr(ui, "INSPECTABLE", True, raising=False)
+
+        with PatchPost(
+            self._TIMELINE_MODULE, Post.INSPECTABLE_ELEMENT_SELECTED
+        ) as mock:
+            lcma_tlui.select_element(ui)
+
+        mock.assert_called()

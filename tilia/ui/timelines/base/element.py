@@ -15,6 +15,11 @@ class TimelineUIElement(ABC):
     UPDATE_TRIGGERS = []
     CONTEXT_MENU_CLASS: type[TimelineUIElementContextMenu] | None = None
     FIELD_NAMES_TO_ATTRIBUTES: dict[str, str] = {}
+    # Whether selecting this element drives the shared Inspector dock. Elements with a
+    # dedicated editor (e.g. the LCMA builder) set this False to suppress the generic
+    # Inspector, while still routing INSPECTOR_FIELD_EDITED so that editor can reuse the
+    # validated edit path.
+    INSPECTABLE = True
 
     def __init__(
         self,
