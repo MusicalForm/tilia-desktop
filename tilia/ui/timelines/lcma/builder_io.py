@@ -23,13 +23,8 @@ def set_annotation_data(timeline_id: int, component_id: int, jsonld: str) -> boo
 
     _, success = timeline.set_component_data(component_id, "annotation_data", jsonld)
     if success:
-        # no_repeat + repeat_identifier collapses a burst of edits to the same
-        # unit into a single undo entry (mirrors the inspector). Per-edit
-        # granularity / debouncing is a later refinement.
-        post(
-            Post.APP_STATE_RECORD,
-            "lcma annotation edit",
-            no_repeat=True,
-            repeat_identifier=f"annotation_data_{component_id}",
-        )
+        # Each save is a discrete, deliberate commit (⌘⏎ in the entry bar — the editor no longer
+        # saves live on every keystroke), so it earns its own undo entry. A ⌘⏎ that changed nothing
+        # is dropped by the dock's echo guard before it reaches here, so no no-op edit is recorded.
+        post(Post.APP_STATE_RECORD, "lcma annotation edit")
     return success

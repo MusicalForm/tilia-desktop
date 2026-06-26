@@ -17,7 +17,7 @@ from tilia.ui.windows.view_window import ViewDockWidget
 # The single-file React annotation builder, vendored from the annotation-ui
 # repo (`npm run build:embed` -> dist-embed/embed.html). Self-contained, loaded
 # over file://. The JS side connects back over QWebChannel — see annotation-ui
-# src/embed.ts for the contract this dock implements.
+# src/embed.tsx for the contract this dock implements.
 EMBED_HTML = Path(__file__).parent / "builder" / "embed.html"
 
 
@@ -51,7 +51,8 @@ class LcmaBuilderDock(ViewDockWidget):
 
     One instance per session (get-or-create via Get.LCMA_BUILDER). It follows
     timeline selection: selecting an LCMA unit pushes that unit's JSON-LD into
-    the builder; edits in the builder are written straight back onto the unit.
+    the builder; a committed edit (⌘⏎ in the entry bar) is written back onto the
+    unit. The bar surfaces "⌘⏎ save" itself, so the dock adds no save affordance.
     """
 
     def __init__(self):
@@ -102,8 +103,10 @@ class LcmaBuilderDock(ViewDockWidget):
         if self._tl_id is None or self._cmp_id is None:
             return
         if jsonld == self._last_value:
-            # Echo of the value we just loaded — nothing to write. (The builder
-            # doesn't echo programmatic loads, so this is purely defensive.)
+            # A ⌘⏎ commit that changed nothing (same JSON-LD we last loaded or saved). With
+            # discrete commits this is load-bearing, not just defensive: it stops an unchanged
+            # commit from writing and recording a no-op undo entry. (Programmatic loads never
+            # save, so they can't echo here.)
             return
         self._last_value = jsonld
         set_annotation_data(self._tl_id, self._cmp_id, jsonld)

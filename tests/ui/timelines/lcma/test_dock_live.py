@@ -6,8 +6,10 @@ event loop to prove, end to end and inside TiLiA:
 
   * the builder boots under file:// and the QWebChannel handshake fires
     (backend.ready) -> _bridge_ready
-  * a simulated edit in the builder calls backend.save_annotation, which writes
-    JSON-LD onto the real LCMA component via set_component_data (JS -> Py)
+  * a COMMITTED edit in the builder (type a function, then ⌘⏎) calls
+    backend.save_annotation, which writes JSON-LD onto the real LCMA component
+    via set_component_data (JS -> Py). The editor is the AttributeEntry bar now,
+    and it saves DISCRETELY on ⌘⏎ — not live per keystroke.
   * pushing a previously-saved annotation back via loadAnnotation restores it in
     the builder (Py -> JS)
 
@@ -28,25 +30,33 @@ pytestmark = pytest.mark.skipif(
     reason="live webview test; set LCMA_LIVE=1 to run",
 )
 
-READ_NAME = (
-    "document.querySelector('.name-row input') ? "
-    "document.querySelector('.name-row input').value : '<no-input>'"
+# The bar renders committed slots as chips (text) and keeps drafts in inputs, so read BOTH the
+# visible text and every input value, lowercased — robust to the bar's exact DOM.
+READ_STATE = (
+    "(function () {"
+    "  var vals = [].slice.call(document.querySelectorAll('input'))"
+    "    .map(function (i) { return i.value; });"
+    "  var text = document.body ? document.body.innerText : '';"
+    "  return (text + '|' + vals.join('|')).toLowerCase();"
+    "})()"
 )
 
 
-def _set_name_js(value: str) -> str:
-    # Drive the builder's controlled name input via React's native value setter
-    # + an input event, as a stand-in for a user edit (this is what fires
-    # save_annotation). Mirrors the annotation-ui embed spike.
+def _commit_function_js(value: str) -> str:
+    # Type `value` into the bar's first input (the function slot) and commit with ⌘⏎ / Ctrl+⏎,
+    # which the bar routes to onUpdate -> backend.save_annotation. Stands in for a user edit; the
+    # bar no longer saves on the input event alone (the form-based live-save editor is retired).
     return (
         "(function () {"
         f"  var v = {json.dumps(value)};"
-        "  var input = document.querySelector('.name-row input');"
+        "  var input = document.querySelector('input');"
         "  if (!input) return 'no-input';"
         "  var setter = Object.getOwnPropertyDescriptor("
         "    window.HTMLInputElement.prototype, 'value').set;"
         "  setter.call(input, v);"
         "  input.dispatchEvent(new Event('input', { bubbles: true }));"
+        "  input.dispatchEvent(new KeyboardEvent('keydown',"
+        "    { key: 'Enter', metaKey: true, ctrlKey: true, bubbles: true }));"
         "  return 'ok';"
         "})()"
     )
@@ -87,22 +97,30 @@ def test_dock_boots_and_round_trips(lcma_tl, lcma_form, lcma_tlui):
 
         dock.load_annotation(lcma_tl.id, lcma_form.id, lcma_form.annotation_data or "")
 
-        # 2. JS -> Py: a builder edit writes JSON-LD onto the real component
-        _run_js(dock, _set_name_js("LiveEdit"))
+        # 2. JS -> Py: a ⌘⏎ commit writes JSON-LD (with the committed function) onto the component
+        _run_js(dock, _commit_function_js("verse"))
         assert _wait_until(
-            lambda: "LiveEdit" in (lcma_form.annotation_data or "")
+            lambda: "verse" in (lcma_form.annotation_data or "")
         ), f"save_annotation did not reach the component: {lcma_form.annotation_data!r}"
-        saved_live = lcma_form.annotation_data
 
-        # change it again so the next step is a visible restore
-        _run_js(dock, _set_name_js("Changed"))
-        assert _wait_until(lambda: "Changed" in (lcma_form.annotation_data or ""))
-
-        # 3. Py -> JS: pushing the earlier annotation back restores it in the UI
-        dock.load_annotation(lcma_tl.id, lcma_form.id, saved_live)
-        assert _wait_until(lambda: _read_js(dock, READ_NAME) == "LiveEdit"), (
-            "loadAnnotation did not restore the builder's name field "
-            f"(got {_read_js(dock, READ_NAME)!r})"
+        # 3. Py -> JS: pushing a distinct annotation back shows it in the bar
+        chorus = json.dumps(
+            {
+                "forms": [
+                    {
+                        "@type": "lcma:Form",
+                        "function": {
+                            "@type": "lcma:Function",
+                            "hasCategory": "fn:chorus",
+                        },
+                    }
+                ]
+            }
+        )
+        dock.load_annotation(lcma_tl.id, lcma_form.id, chorus)
+        assert _wait_until(lambda: "chorus" in (_read_js(dock, READ_STATE) or "")), (
+            "loadAnnotation did not restore the builder "
+            f"(got {_read_js(dock, READ_STATE)!r})"
         )
     finally:
         dock.deleteLater()
