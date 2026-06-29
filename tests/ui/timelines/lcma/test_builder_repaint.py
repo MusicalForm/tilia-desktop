@@ -10,6 +10,8 @@ The live end-to-end (real webview ⌘⏎ -> element) lives in test_dock_live.py.
 
 import json
 
+from tests.mock import PatchPost
+from tilia.requests import Post
 from tilia.ui.timelines.lcma import builder_io
 from tilia.ui.timelines.lcma import span_view as sv
 
@@ -123,5 +125,47 @@ class TestBuilderHeader:
             dock.clear_annotation(lcma_form.id)
             assert dock._start_end_label.text() == "—"
             assert dock._comments_edit.toPlainText() == ""
+        finally:
+            dock.deleteLater()
+
+
+class TestBuilderCommentsEdit:
+    """Editing the header's Comments writes back to the unit through INSPECTOR_FIELD_EDITED (the
+    Inspector's validated path), and a programmatic refresh of the field never echoes as an edit.
+    """
+
+    def _dock(self):
+        from tilia.ui.timelines.lcma.builder_dock import LcmaBuilderDock
+
+        return LcmaBuilderDock()
+
+    def test_typing_writes_comments_to_unit(
+        self, lcma_tl, lcma_tlui, lcma_form, monkeypatch
+    ):
+        import tilia.ui.timelines.lcma.builder_dock as bd
+
+        dock = self._dock()
+        monkeypatch.setattr(bd, "get_or_create_builder_dock", lambda: dock)
+        try:
+            ui = lcma_tlui.get_element(lcma_form.id)
+            # real selection registers the element's INSPECTOR_FIELD_EDITED listener and binds the
+            # dock to the unit (on_select -> load_annotation)
+            lcma_tlui.select_element(ui)
+            assert dock._cmp_id == lcma_form.id
+
+            dock._comments_edit.setPlainText("typed in header")
+            assert lcma_form.get_data("comments") == "typed in header"
+        finally:
+            dock.deleteLater()
+
+    def test_programmatic_refresh_does_not_echo(self, lcma_tl, lcma_tlui, lcma_form):
+        dock = self._dock()
+        try:
+            dock.load_annotation(lcma_tl.id, lcma_form.id, "")
+            with PatchPost(
+                "tilia.ui.timelines.lcma.builder_dock", Post.INSPECTOR_FIELD_EDITED
+            ) as mock:
+                dock._set_comments_text("refreshed")
+            mock.assert_not_called()
         finally:
             dock.deleteLater()

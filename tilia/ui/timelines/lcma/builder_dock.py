@@ -16,6 +16,7 @@ from tilia.requests import (
     Post,
     get,
     listen,
+    post,
     serve,
     stop_listening_to_all,
     stop_serving_all,
@@ -110,16 +111,18 @@ class LcmaBuilderDock(ViewDockWidget):
     def _setup_ui(self):
         # The bound unit's temporal bounds + comments sit in a header above the builder, so the
         # whole unit is edited in one pane (LCMA units opt out of the shared Inspector). Start/end
-        # are read-only here — they're set by dragging the unit's handles. Comments are read-only
-        # in this step; the editable write-back lands next.
+        # are read-only — they're set by dragging the unit's handles. Comments are editable and
+        # write back through the same INSPECTOR_FIELD_EDITED path the Inspector uses.
+        # Guards a programmatic comments refresh from echoing back as an edit.
+        self._suppress_comments_signal = False
         self._start_end_label = QLabel("—")
         self._start_end_label.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByMouse
         )
         self._comments_edit = QTextEdit()
         self._comments_edit.setAcceptRichText(False)
-        self._comments_edit.setReadOnly(True)
         self._comments_edit.setMaximumHeight(80)
+        self._comments_edit.textChanged.connect(self._on_comments_changed)
 
         form = QFormLayout()
         form.addRow("Start / end", self._start_end_label)
@@ -198,8 +201,25 @@ class LcmaBuilderDock(ViewDockWidget):
         self._set_comments_text(fields.get("Comments") or "")
 
     def _set_comments_text(self, text: str):
-        if self._comments_edit.toPlainText() != text:
-            self._comments_edit.setPlainText(text)
+        if self._comments_edit.toPlainText() == text:
+            return
+        self._suppress_comments_signal = True
+        self._comments_edit.setPlainText(text)
+        self._suppress_comments_signal = False
+
+    def _on_comments_changed(self):
+        # Mirror the Inspector's edit path: post INSPECTOR_FIELD_EDITED for "Comments" and let the
+        # selected element apply it (no-op guard + undo-burst collapse keyed on this dock's id).
+        # Suppressed while a programmatic refresh sets the text, so a refresh can't echo back.
+        if self._suppress_comments_signal or self._cmp_id is None:
+            return
+        post(
+            Post.INSPECTOR_FIELD_EDITED,
+            "Comments",
+            self._comments_edit.toPlainText(),
+            self._cmp_id,
+            id(self),
+        )
 
     # --- internals ---
 
