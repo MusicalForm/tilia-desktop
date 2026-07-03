@@ -78,8 +78,17 @@ class TiliaMainWindow(QMainWindow):
         self.setAcceptDrops(True)
         self._drop_filter = FileDropEventFilter()
 
-    def setup_qapplication(self, q_application: QApplication):
-        q_application.installEventFilter(self._drop_filter)
+    def install_file_drop_filter(self) -> None:
+        # Scope the file-drop filter to the main window, NOT the QApplication.
+        # An application-global Python event filter makes PySide build a Python
+        # wrapper for the *target of every delivered event*; when the LCMA
+        # builder dock's QtWebEngine view churns internal QObjects mid-
+        # destruction, that wrapper build dereferences a freed pointer in
+        # PySide::typeName and segfaults with no traceback (crash on selecting
+        # an LCMA unit). Drag events over children that don't accept drops
+        # propagate up to the main window (which does), so a window-scoped
+        # filter still catches file drops anywhere in the window.
+        self.installEventFilter(self._drop_filter)
 
     def changeEvent(self, event: QEvent) -> None:
         if event.type() == event.Type.ThemeChange:
@@ -342,7 +351,7 @@ class QtUI:
     def _setup_main_window(self, mw: TiliaMainWindow):
         self.main_window = mw
         if os.environ.get("ENVIRONMENT") != "test":
-            self.main_window.setup_qapplication(self.q_application)
+            self.main_window.install_file_drop_filter()
         self._reset_window_title()
 
     @staticmethod
