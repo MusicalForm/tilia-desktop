@@ -659,15 +659,6 @@
       "string_writable": false
     },
     {
-      "name": "combination",
-      "abbr": "&",
-      "aliases": [
-        "comb"
-      ],
-      "symbol": "&",
-      "string_writable": false
-    },
-    {
       "name": "concatenation",
       "abbr": ",",
       "aliases": [
@@ -1046,7 +1037,8 @@
             "label": "voice"
           }
         ],
-        "multiValued": true
+        "multiValued": true,
+        "deltaValued": true
       },
       {
         "name": "mode",
