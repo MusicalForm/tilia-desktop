@@ -126,8 +126,13 @@ class App:
     ) -> None:
         if scale_timelines:
             self.should_scale_timelines = scale_timelines
-        self.on_media_duration_changed(duration)
+        # Post the new duration first so time_x_converter (and other
+        # coordinate listeners) update before on_media_duration_changed
+        # crops or scales components — otherwise the UI re-positions
+        # cropped elements against the OLD media_duration and the
+        # timeline appears to stop at the old end-time (#496).
         post(Post.FILE_MEDIA_DURATION_CHANGED, duration)
+        self.on_media_duration_changed(duration)
 
     def is_file_modified(self) -> bool:
         return self.file_manager.is_file_modified(self.get_app_state())
@@ -163,9 +168,9 @@ class App:
         if not success:
             self.on_restore_state(prev_state)
             return False
-        post(Post.APP_FILE_LOADED, file)
 
         self.file_manager.file = file
+        post(Post.APP_FILE_LOADED, file)
         self.update_recent_files()
 
         return True

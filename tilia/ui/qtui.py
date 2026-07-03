@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import functools
+import os
 import re
 from pathlib import Path
 
@@ -8,6 +9,7 @@ from PySide6 import QtGui
 from PySide6.QtCore import (
     QEvent,
     QKeyCombination,
+    QObject,
     Qt,
     QtMsgType,
     QUrl,
@@ -25,6 +27,7 @@ from PySide6.QtWidgets import (
 
 import tilia.constants
 import tilia.errors
+import tilia.media.constants
 import tilia.parsers.csv.beat
 import tilia.parsers.csv.harmony
 import tilia.parsers.csv.hierarchy
@@ -33,7 +36,7 @@ import tilia.parsers.csv.pdf
 import tilia.parsers.score.musicxml
 import tilia.ui.dialogs.file
 import tilia.ui.timelines.constants
-from tilia import constants
+from tilia.file.media_metadata import MediaMetadata
 from tilia.file.tilia_file import TiliaFile
 from tilia.log import logger
 from tilia.requests import Get, Post, get, listen, post, serve
@@ -66,24 +69,50 @@ from .windows.settings import SettingsWindow
 class TiliaMainWindow(QMainWindow):
     def __init__(self):
         QIcon.setThemeSearchPaths([(Path(__file__).parent / "icons").as_posix()])
-        QIcon.setThemeName("tilia" + QApplication.styleHints().colorScheme().name)
+        QIcon.setThemeName(self._tilia_theme_name())
         super().__init__()
         self.setWindowTitle(tilia.constants.APP_NAME)
         self.setWindowIcon(QIcon.fromTheme("tilia"))
         self.setStatusTip("Main window")
         qInstallMessageHandler(self.handle_qt_log_message)
+        self.setAcceptDrops(True)
+        self._drop_filter = FileDropEventFilter()
+
+    def setup_qapplication(self, q_application: QApplication):
+        q_application.installEventFilter(self._drop_filter)
 
     def changeEvent(self, event: QEvent) -> None:
         if event.type() == event.Type.ThemeChange:
-            QIcon.setThemeName("tilia" + QApplication.styleHints().colorScheme().name)
+            QIcon.setThemeName(self._tilia_theme_name())
 
         return super().changeEvent(event)
+
+    @staticmethod
+    def _tilia_theme_name() -> str:
+        # On Linux the platform may not advertise a colour preference,
+        # in which case styleHints().colorScheme() returns Unknown and
+        # we'd otherwise pick the non-existent "tiliaUnknown" theme,
+        # leaving every custom icon blank (#475).
+        scheme = QApplication.styleHints().colorScheme()
+        return "tiliaDark" if scheme == Qt.ColorScheme.Dark else "tiliaLight"
+
+    # Qt warnings emitted on every paint while the SVG score viewer is open.
+    # They are harmless rendering-engine noise but flood the log loudly enough
+    # to make the app unresponsive (see issue #513).
+    QT_LOG_NOISE_PATTERNS = (
+        "QFont::setPixelSize: Pixel size <= 0",
+        "QWindowsFontEngineDirectWrite::addGlyphsToPath: GetGlyphRunOutline failed",
+    )
 
     @staticmethod
     def handle_qt_log_message(type, context, msg):
         f_msg = f"[{type.name}] {context.file}:{context.line} - {msg}"
         if type == QtMsgType.QtFatalMsg:
             raise Exception(f_msg)
+        if type == QtMsgType.QtWarningMsg and any(
+            p in msg for p in TiliaMainWindow.QT_LOG_NOISE_PATTERNS
+        ):
+            return
         # Qt's "Ambiguous shortcut overload" is logged at warning level and
         # otherwise disappears silently — surface it to the user so we don't
         # miss new collisions in production. Anything registered via
@@ -155,7 +184,51 @@ class TiliaMainWindow(QMainWindow):
             commands.execute("view.zoom.out", zoom_level)
 
 
+class FileDropEventFilter(QObject):
+    """Routes file drag/drop events from any widget to the main window.
+
+    Qt only delivers drag/drop events to widgets with setAcceptDrops(True),
+    and child widgets cover most of TiliaMainWindow, so an app-level filter
+    is needed to catch drops anywhere in the window.
+    """
+
+    _DRAG_EVENT_TYPES = (
+        QEvent.Type.DragEnter,
+        QEvent.Type.DragMove,
+        QEvent.Type.Drop,
+    )
+
+    @staticmethod
+    def _is_file_droppable(urls: list[QUrl]):
+        if len(urls) != 1 or not urls[0].isLocalFile():
+            return False
+        ext = Path(urls[0].toLocalFile()).suffix[1:].lower()
+        return ext in {tilia.constants.FILE_EXTENSION}.union(
+            tilia.media.constants.ALL_SUPPORTED_MEDIA_FORMATS
+        )
+
+    @staticmethod
+    def _dispatch_dropped_path(path: str) -> None:
+        if Path(path).suffix[1:].lower() == tilia.constants.FILE_EXTENSION:
+            commands.execute("file.open", path)
+        else:
+            post(Post.APP_MEDIA_LOAD, path)
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if event.type() not in self._DRAG_EVENT_TYPES:
+            return False
+        if not self._is_file_droppable(event.mimeData().urls()):
+            return False
+        if event.type() == QEvent.Type.Drop:
+            path = event.mimeData().urls()[0].toLocalFile()
+            self._dispatch_dropped_path(path)
+        event.acceptProposedAction()
+        return True
+
+
 class QtUI:
+    DEFAULT_WINDOW_TITLE = f"untitled.tla - {tilia.constants.APP_NAME}"
+
     def __init__(self, q_application: QApplication, mw: TiliaMainWindow):
         self.app = None
         self.q_application = q_application
@@ -183,6 +256,14 @@ class QtUI:
     def timeline_width(self):
         return self.playback_area_width + 2 * self.playback_area_margin
 
+    @property
+    def window_title(self):
+        return self.main_window.windowTitle()
+
+    @window_title.setter
+    def window_title(self, value: str):
+        self.main_window.setWindowTitle(value)
+
     def _setup_sizes(self):
         self.playback_area_width = tilia.ui.timelines.constants.PLAYBACK_AREA_WIDTH
         self.playback_area_margin = tilia.ui.timelines.constants.PLAYBACK_AREA_MARGIN
@@ -190,6 +271,9 @@ class QtUI:
     def _setup_requests(self):
         LISTENS = {
             (Post.APP_FILE_LOADED, self.on_file_loaded),
+            (Post.APP_SETUP_FILE, self.on_file_setup),
+            (Post.FILE_SAVED, self.on_file_saved),
+            (Post.MEDIA_METADATA_TITLE_UPDATED, self.on_metadata_title_set_done),
             (Post.PLAYBACK_AREA_SET_WIDTH, self.on_timeline_set_width),
             (Post.WINDOW_OPEN, self.on_window_open),
             (Post.WINDOW_CLOSE, self.on_window_close),
@@ -257,6 +341,9 @@ class QtUI:
 
     def _setup_main_window(self, mw: TiliaMainWindow):
         self.main_window = mw
+        if os.environ.get("ENVIRONMENT") != "test":
+            self.main_window.setup_qapplication(self.q_application)
+        self._reset_window_title()
 
     @staticmethod
     def _setup_fonts():
@@ -333,11 +420,44 @@ class QtUI:
     def get_window_state(self):
         return self.main_window.saveState()
 
+    def _set_window_title(self, title: str) -> None:
+        self.window_title = f"{title} - {tilia.constants.APP_NAME}"
+
+    def _reset_window_title(self) -> None:
+        self.window_title = self.DEFAULT_WINDOW_TITLE
+
+    def _set_window_title_from_metadata_title(self) -> None:
+        title = get(Get.MEDIA_METADATA).get("title")
+        if not title or title == MediaMetadata.REQUIRED_FIELDS.get("title"):
+            # If there is no title, or title is the default, take title from file name
+            title = Path(get(Get.FILE_PATH)).stem
+
+        if not title:
+            self._reset_window_title()  # pragma: no cover
+        else:
+            self._set_window_title(str(title))
+
+    def on_metadata_title_set_done(self, title: str) -> None:
+        if title:
+            self._set_window_title(title)
+        elif path := get(Get.FILE_PATH):
+            self._set_window_title(Path(path).stem)
+        else:
+            self._reset_window_title()
+
+    def on_file_saved(self, path: Path | str) -> None:
+        self._set_window_title_from_metadata_title()
+
+    def on_file_setup(self) -> None:
+        self._reset_window_title()
+
     def on_file_loaded(self, file: TiliaFile) -> None:
         geometry, state = settings.get_geometry_and_state_from_path(file.file_path)
         if geometry and state:
             self.main_window.restoreGeometry(geometry)
             self.main_window.restoreState(state)
+
+        self._set_window_title_from_metadata_title()
 
     def _setup_widgets(self):
         self.timeline_toolbars = QToolBar()
@@ -431,10 +551,11 @@ class QtUI:
             if window is not None:
                 window.close()
         self.main_window.setFocus()
+        self._reset_window_title()
 
     @staticmethod
     def on_open_website_help():
-        QDesktopServices.openUrl(QUrl(f"{constants.WEBSITE_URL}/help"))
+        QDesktopServices.openUrl(QUrl(f"{tilia.constants.WEBSITE_URL}/help"))
 
     @staticmethod
     def show_crash_dialog(exception_info):

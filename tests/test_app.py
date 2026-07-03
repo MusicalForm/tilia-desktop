@@ -20,6 +20,7 @@ from tests.utils import (
     load_local_media,
     load_youtube_media,
     save_and_reopen,
+    save_tilia_to_tmp_path,
 )
 from tilia.media.player import QtAudioPlayer, YouTubePlayer
 from tilia.requests import Get, Post, get, post
@@ -304,6 +305,30 @@ class TestScaleCropTimeline:
         assert len(marker_tlui) == 1
         assert marker_tlui[0].get_data("time") == 10
 
+    def test_crop_repositions_hierarchy_against_new_duration(
+        self, hierarchy_tlui, tilia_state
+    ):
+        # Regression test for #496: when on_media_duration_changed
+        # cropped components, FILE_MEDIA_DURATION_CHANGED was posted
+        # afterwards, so update_position used the *old* media_duration
+        # in time_x_converter. A hierarchy cropped to fill the new
+        # (shorter) timeline ended up drawn against the old end-time
+        # and stopped halfway across the visible area.
+        from tilia.ui.coords import time_x_converter
+        from tilia.ui.timelines.hierarchy.element import HierarchyUI
+
+        tilia_state.set_duration(100)
+        hierarchy_tlui.create_hierarchy(0, 100, 1)
+        tilia_state.set_duration(50, scale_timelines="no")  # falls back to crop
+
+        # After crop the component spans [0, 50]; the new media is 50s
+        # long so the body's right edge must align with x(50) — minus
+        # the small X_OFFSET the body adds — i.e. the timeline's right
+        # margin under the *new* converter.
+        body_right = hierarchy_tlui[0].body.rect().right()
+        expected_right = time_x_converter.get_x_by_time(50) - HierarchyUI.X_OFFSET
+        assert body_right == pytest.approx(expected_right)
+
 
 class TestFileSetup:
     def test_slider_timeline_is_created_when_loaded_file_does_not_have_one(
@@ -580,6 +605,17 @@ class TestFileNew:
         assert get(Get.MEDIA_DURATION) == 0
         assert not tilia.player.media_path
 
+    def test_player_toolbar_is_disabled(self, tilia, qtui):
+        with Serve(Get.FROM_USER_MEDIA_PATH, (True, EXAMPLE_MEDIA_PATH)):
+            commands.execute("media.load.local")
+
+        assert qtui.player_toolbar.isEnabled()
+
+        with Serve(Get.FROM_USER_SHOULD_SAVE_CHANGES, (True, False)):
+            commands.execute("file.new")
+
+        assert not qtui.player_toolbar.isEnabled()
+
     def test_all_windows_are_closed(self, tilia, qtui):
         for kind in WindowKind:
             post(Post.WINDOW_OPEN, kind)
@@ -746,3 +782,87 @@ class TestIDs:
             marker_tl.create_component(ComponentKind.MARKER, time=1, id=id)
         error.assert_called()
         assert marker_tl.components[0].id == "1"
+
+
+class TestWindowTitle:
+    @staticmethod
+    def assert_window_title(qtui, title: str):
+        assert qtui.window_title == f"{title} - {tilia.constants.APP_NAME}"
+
+    @staticmethod
+    def assert_window_title_is_default(qtui):
+        assert qtui.window_title == qtui.DEFAULT_WINDOW_TITLE
+
+    @staticmethod
+    def set_media_title(value: str):
+        post(Post.MEDIA_METADATA_FIELD_SET, "title", value)
+
+    def test_is_default_by_default(self, qtui):
+        self.assert_window_title_is_default(qtui)
+
+    def test_is_file_title_after_file_save_if_title(self, qtui, tmp_path, tilia_state):
+        file_title = "My Test Song"
+        self.set_media_title(file_title)
+        save_tilia_to_tmp_path(tmp_path, "test_window_title.tla")
+        self.assert_window_title(qtui, file_title)
+
+    def test_is_title_after_title_is_set(self, qtui, tilia_state):
+        file_title = "My Title"
+        self.set_media_title(file_title)
+        self.assert_window_title(qtui, file_title)
+
+    def test_reverts_to_default_if_title_becomes_empty(self, qtui, tilia_state):
+        file_title = "Temporary Title"
+        self.set_media_title(file_title)
+        self.assert_window_title(qtui, file_title)
+
+        self.set_media_title("")
+        self.assert_window_title_is_default(qtui)
+
+    def test_is_filename_after_file_save_if_no_title(self, qtui, tmp_path):
+        save_tilia_to_tmp_path(tmp_path, "test_window_title.tla")
+        self.assert_window_title(qtui, "test_window_title.tla")
+
+    def test_is_title_after_file_save_if_title(self, qtui, tmp_path):
+        file_title = "Should Be This"
+        self.set_media_title(file_title)
+        save_tilia_to_tmp_path(tmp_path, "Should Not Be This.tla")
+        self.assert_window_title(qtui, file_title)
+
+    def test_is_default_after_new_file(self, qtui, tmp_path):
+        save_tilia_to_tmp_path(tmp_path, "test_window_title.tla")
+        commands.execute("file.new")
+        self.assert_window_title_is_default(qtui)
+
+    def test_reopening_file_updates_title(self, qtui, tmp_path):
+        file_title = "A TiLiA File Title"
+        self.set_media_title(file_title)
+        path = save_tilia_to_tmp_path(tmp_path)
+
+        commands.execute("file.new")
+        self.assert_window_title_is_default(qtui)
+
+        commands.execute("file.open", path)
+        self.assert_window_title(qtui, file_title)
+
+    def test_is_filename_after_file_load_if_no_title(self, qtui, tmp_path):
+        save_tilia_to_tmp_path(tmp_path, "test_window_title.tla")
+        self.assert_window_title(qtui, "test_window_title.tla")
+
+    def test_is__title_after_load_if_title(self, qtui, tmp_path, tilia_state):
+        file_title = "Loaded Song Title"
+        self.set_media_title(file_title)
+        save_tilia_to_tmp_path(tmp_path)
+        self.assert_window_title(qtui, file_title)
+
+    def test_is_filename_if_title_is_set_to_empty_but_file_has_been_saved(
+        self, qtui, tmp_path
+    ):
+        file_title = "Yet Another Title"
+        file_name = "should_revert_to_this.tla"
+
+        self.set_media_title(file_title)
+        save_tilia_to_tmp_path(tmp_path, file_name)
+
+        self.set_media_title("")
+        self.assert_window_title(qtui, file_name)

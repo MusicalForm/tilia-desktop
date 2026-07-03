@@ -19,6 +19,7 @@ from tilia.requests import (
     stop_serving_all,
 )
 from tilia.ui import commands
+from tilia.ui.player import PlayerStatus
 from tilia.utils import get_tilia_class_string
 
 
@@ -136,6 +137,7 @@ class Player(ABC):
         self.is_playing = False
         self.is_looping = False
         post(Post.PLAYER_CANCEL_LOOP)
+        post(Post.PLAYER_UPDATE_CONTROLS, PlayerStatus.NO_MEDIA)
 
     def toggle_play(self, toggle_is_playing: bool):
         if toggle_is_playing:
@@ -193,8 +195,8 @@ class Player(ABC):
     def on_playback_rate_try(self, playback_rate: float) -> None:
         self._engine_try_playback_rate(playback_rate)
 
-    def on_seek(self, time: float, if_playing: bool = True) -> None:
-        if not if_playing and self.is_playing:
+    def on_seek(self, time: float, seek_if_playing: bool = True) -> None:
+        if not seek_if_playing and self.is_playing:
             return
 
         if self.is_media_loaded:

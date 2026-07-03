@@ -385,7 +385,7 @@ class TimelineUI(ABC):  # noqa: B024
     @staticmethod
     def _seek_to_element(element: T) -> None:
         if hasattr(element, "seek_time"):
-            commands.execute("media.seek", element.seek_time, if_playing=False)
+            commands.execute("media.seek", element.seek_time, seek_if_playing=False)
 
     @staticmethod
     def _trigger_left_click_side_effects(element: T, item: QGraphicsItem) -> None:
