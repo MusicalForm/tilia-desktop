@@ -19,7 +19,16 @@ if PR isolation is wanted.
   timeline create via `timeline.py`, not user-hideable through `registers_in_view_menu = False`,
   Enter-focus via `focus_editor`) — see `builder_dock.py` + `test_pane_layout.py`. So the validation
   dock **mirrors `builder_dock.py`**, and item 4 is now purely the dock's validation content + wiring.
-- **Next: Phase 3** — `validation_dock.py`. (19 targeted tests green so far.)
+- **Phase 3 done** — `validation_dock.py` (native `QTreeWidget` + invisible `QWebEnginePage`
+  running the vendored `diagnose()`); `Get.LCMA_VALIDATION`; eager-created, left-docked, not
+  user-hideable, bound to the first LCMA timeline via `timeline.py`; click-to-select (reuses
+  `on_select`, so it also loads the unit into the builder); debounced refresh on component
+  create/delete/edit. Tests: `test_validation_dock.py` (mocked engine) +
+  `test_validation_dock_live.py` (LCMA_LIVE=1 — proves the viewless page really runs
+  `diagnoseSession`). Full LCMA suite green; ruff + black clean.
+- **Remaining:** visual polish only — two always-visible left docks (builder + validation) now
+  share the left area; how they tab/stack wants a real-GUI look. Optional later: scroll-to on
+  select, and rebinding if the bound LCMA timeline is deleted.
 
 ## Decision: Hybrid (native Qt UI + reused JS engine)
 
