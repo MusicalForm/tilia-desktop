@@ -530,8 +530,19 @@ class QtUI:
         return self._windows[kind] is not None
 
     def on_timeline_element_inspect(self):
-        if not get(Get.TIMELINE_ELEMENTS_SELECTED):
+        selected_tluis = get(Get.TIMELINE_ELEMENTS_SELECTED)
+        if not selected_tluis:
             return
+        # An element can opt out of the shared Inspector (INSPECTABLE = False) and edit itself in a
+        # dedicated pane — LCMA units do this in the builder dock. If a selected element exposes
+        # such an editor, focus that instead of raising the (for it, empty) Inspector.
+        for tlui in selected_tluis:
+            for element in tlui.selected_elements:
+                if not getattr(element, "INSPECTABLE", True) and hasattr(
+                    element, "focus_dedicated_editor"
+                ):
+                    element.focus_dedicated_editor()
+                    return
         self.on_window_open(WindowKind.INSPECT)
 
     @staticmethod
