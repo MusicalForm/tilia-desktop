@@ -220,6 +220,15 @@ class LcmaFormUI(HierarchyUI):
         if dock is not None:
             dock.clear_annotation(self.id)
 
+    def focus_dedicated_editor(self) -> None:
+        # Enter/Return over a selected LCMA unit routes here (see qtui.on_timeline_element_inspect):
+        # LCMA units opt out of the shared Inspector (INSPECTABLE = False) and are edited in the
+        # builder dock, so Enter focuses that dock instead. on_select has already created and bound
+        # it; get-or-create keeps this safe regardless.
+        from tilia.ui.timelines.lcma.builder_dock import get_or_create_builder_dock
+
+        get_or_create_builder_dock().focus_editor()
+
 
 class LcmaFormBody(HierarchyBody):
     """A hierarchy body that draws a dashed border when its unit's function is *notional*

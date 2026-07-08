@@ -65,6 +65,10 @@ class LcmaBuilderDock(ViewDockWidget):
     unit. The bar surfaces "⌘⏎ save" itself, so the dock adds no save affordance.
     """
 
+    # Always-visible: no View-menu toggle (ViewDockWidget already gives it no close button), so
+    # the pane can't be hidden once an LCMA timeline brings it up.
+    registers_in_view_menu = False
+
     def __init__(self):
         super().__init__("LCMA Annotation Builder", menu_title="LCMA Builder")
         self.setObjectName("lcma-builder")
@@ -95,7 +99,7 @@ class LcmaBuilderDock(ViewDockWidget):
 
         main_window = get(Get.MAIN_WINDOW)
         self.setParent(main_window)
-        main_window.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self)
+        main_window.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self)
 
     def _setup_web_engine(self):
         self.view = QWebEngineView()
@@ -109,10 +113,12 @@ class LcmaBuilderDock(ViewDockWidget):
         self.view.load(QUrl.fromLocalFile(str(EMBED_HTML.resolve())))
 
     def _setup_ui(self):
-        # The bound unit's temporal bounds + comments sit in a header above the builder, so the
-        # whole unit is edited in one pane (LCMA units opt out of the shared Inspector). Start/end
-        # are read-only — they're set by dragging the unit's handles. Comments are editable and
-        # write back through the same INSPECTOR_FIELD_EDITED path the Inspector uses.
+        # The bound unit's temporal bounds + comments sit in a detail panel BELOW the builder, so
+        # the whole unit is edited in one pane (LCMA units opt out of the shared Inspector). The
+        # LCMA annotation builder (the web view) takes the top and the stretch; the read-only
+        # start/end and the editable comments hang beneath it. Start/end are set by dragging the
+        # unit's handles; comments write back through the same INSPECTOR_FIELD_EDITED path the
+        # Inspector uses.
         # Guards a programmatic comments refresh from echoing back as an edit.
         self._suppress_comments_signal = False
         self._start_end_label = QLabel("—")
@@ -127,14 +133,14 @@ class LcmaBuilderDock(ViewDockWidget):
         form = QFormLayout()
         form.addRow("Start / end", self._start_end_label)
         form.addRow("Comments", self._comments_edit)
-        header = QWidget()
-        header.setLayout(form)
+        detail_panel = QWidget()
+        detail_panel.setLayout(form)
 
         container = QWidget()
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(header)
         layout.addWidget(self.view, stretch=1)
+        layout.addWidget(detail_panel)
         self.setWidget(container)
 
     # --- bridge callbacks (called from the QWebChannel backend) ---
@@ -178,6 +184,15 @@ class LcmaBuilderDock(ViewDockWidget):
         self._last_value = ""
         self._refresh_header()  # ids now None -> blanks the header
         self._push_or_queue("")  # empty -> the builder shows a blank label
+
+    def focus_editor(self):
+        # Enter/Return over a selected LCMA unit routes here instead of raising the shared
+        # Inspector (which LCMA units opt out of). Bring the pane forward and hand keyboard focus
+        # to the annotation builder's entry bar so the user can start typing at once.
+        if not self.isVisible():
+            self.show()
+        self.raise_()
+        self.view.setFocus()
 
     # --- header (start/end + comments for the bound unit) ---
 

@@ -27,3 +27,14 @@ class LcmaTimelineUI(HierarchyTimelineUI):
     timeline_class = LcmaTimeline
     TOOLBAR_CLASS = LcmaTimelineToolbar
     menu_class = None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # The builder dock is always visible whenever an LCMA timeline exists — not only after a
+        # unit is selected. Creating it here (get-or-create is a singleton, so multiple LCMA
+        # timelines share the one dock) shows the empty pane up front; selecting a unit then binds
+        # it. The import is deferred so QtWebEngine is pulled in only when an LCMA timeline UI is
+        # actually built — never during backend-only element creation or backend tests.
+        from tilia.ui.timelines.lcma.builder_dock import get_or_create_builder_dock
+
+        get_or_create_builder_dock().show()
