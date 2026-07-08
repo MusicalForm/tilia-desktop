@@ -10,6 +10,11 @@ T = TypeVar("T", QDialog, QDockWidget)
 
 
 class ViewWidget(Generic[T]):
+    # Whether this window/dock is registered as a checkable toggle in the View menu. Subclasses
+    # that must stay always-visible (no user hide/show) set this False, so no toggle is created
+    # and there is no way to close them from the menu.
+    registers_in_view_menu = True
+
     def __init__(self, os_window_title: str, *args, **kwargs):
         self.menu_title = kwargs.pop("menu_title", os_window_title)
         super().__init__(*args, **kwargs)
@@ -18,11 +23,17 @@ class ViewWidget(Generic[T]):
         listen(self, Post.WINDOW_UPDATE_REQUEST, self.on_update_request)
 
     def showEvent(self, event):
-        if not self.is_registered:
-            post(Post.WINDOW_UPDATE_STATE, self.id, WindowState.OPENED, self.menu_title)
-            self.is_registered = True
-        else:
-            post(Post.WINDOW_UPDATE_STATE, self.id, WindowState.OPENED)
+        if self.registers_in_view_menu:
+            if not self.is_registered:
+                post(
+                    Post.WINDOW_UPDATE_STATE,
+                    self.id,
+                    WindowState.OPENED,
+                    self.menu_title,
+                )
+                self.is_registered = True
+            else:
+                post(Post.WINDOW_UPDATE_STATE, self.id, WindowState.OPENED)
         super().showEvent(event)
 
     def closeEvent(self, event):
