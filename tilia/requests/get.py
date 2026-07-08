@@ -50,6 +50,7 @@ class Get(Enum):
     SELECTED_TIME = auto()
     SCORE_VIEWER = auto()
     LCMA_BUILDER = auto()
+    LCMA_VALIDATION = auto()
     TIMELINE = auto()
     TIMELINES = auto()
     TIMELINE_BY_ATTR = auto()

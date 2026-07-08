@@ -36,5 +36,12 @@ class LcmaTimelineUI(HierarchyTimelineUI):
         # it. The import is deferred so QtWebEngine is pulled in only when an LCMA timeline UI is
         # actually built — never during backend-only element creation or backend tests.
         from tilia.ui.timelines.lcma.builder_dock import get_or_create_builder_dock
+        from tilia.ui.timelines.lcma.validation_dock import (
+            get_or_create_validation_dock,
+        )
 
         get_or_create_builder_dock().show()
+        # The validation pane is likewise always-visible and session-scoped: bind it to this
+        # (the first) LCMA timeline. get-or-create is a singleton, so further LCMA timelines reuse
+        # the one dock bound to the first.
+        get_or_create_validation_dock(self.id).show()
