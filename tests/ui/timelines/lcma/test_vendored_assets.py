@@ -1,8 +1,9 @@
-"""Guard the vendored LCMA web assets (embed.html + vocab.json).
+"""Guard the vendored LCMA web assets (embed.html + validator.html + vocab.json).
 
-These two files are copied in from the annotation-ui repo by scripts/sync_lcma_assets.py and
-are easy to vendor wrong (empty write, truncated bundle, stale path). A bad embed.html means a
-blank builder dock; a bad vocab.json means headlines silently fall back to un-abbreviated terms.
+These files are copied in from the annotation-ui repo by scripts/sync_lcma_assets.py and are
+easy to vendor wrong (empty write, truncated bundle, stale path). A bad embed.html means a blank
+builder dock; a bad validator.html means a dead validation pane; a bad vocab.json means headlines
+silently fall back to un-abbreviated terms.
 These run inside the fork's own suite (no cross-repo dependency), so a botched re-vendor fails
 CI here rather than at runtime on a user's machine.
 """
@@ -16,6 +17,7 @@ import tilia.ui.timelines.lcma.span_view as sv
 
 LCMA_DIR = Path(sv.__file__).resolve().parent
 EMBED_HTML = LCMA_DIR / "builder" / "embed.html"
+VALIDATOR_HTML = LCMA_DIR / "validator" / "validator.html"
 # LCMA_DIR parents: [0] timelines, [1] ui, [2] tilia, [3] repo root
 REPO_ROOT = LCMA_DIR.parents[3]
 
@@ -35,6 +37,20 @@ class TestVendoredEmbed:
         assert "webChannelTransport" in html  # QWebChannel transport hook
         assert "save_annotation" in html  # JS -> Py slot (LcmaBuilderBackend)
         assert "LCMA Annotation Builder" in html  # the embed entry's <title>
+
+
+class TestVendoredValidator:
+    def test_present_and_substantial(self):
+        assert VALIDATOR_HTML.is_file(), f"missing vendored validator: {VALIDATOR_HTML}"
+        # single-file bundle inlining the diagnose() engine + jsonld parser (~20KB, no React). A
+        # few hundred bytes means a broken or non-inlined build was vendored.
+        assert VALIDATOR_HTML.stat().st_size > 10_000
+
+    def test_exposes_diagnose_session_and_inlines_engine(self):
+        html = VALIDATOR_HTML.read_text(encoding="utf-8")
+        assert "diagnoseSession" in html  # the Py -> JS entry the validation dock calls (validator.ts)
+        # a diagnostic message string only present if the engine (model/diagnostics.ts) inlined
+        assert "Undefined reference" in html
 
 
 class TestVendoredVocab:
@@ -72,7 +88,8 @@ class TestPackagingDeclaresAssets:
         data = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
         return data["tool"]["setuptools"]["package-data"]["tilia"]
 
-    def test_embed_and_vocab_are_declared(self):
+    def test_lcma_web_assets_are_declared(self):
         pkg = self._package_data()
         assert "ui/timelines/lcma/builder/embed.html" in pkg
+        assert "ui/timelines/lcma/validator/validator.html" in pkg
         assert "ui/timelines/lcma/vocab.json" in pkg

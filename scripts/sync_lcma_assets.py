@@ -3,13 +3,16 @@
 
 Two build artifacts from the annotation-ui project are vendored into TiLiA:
 
-    dist-embed/embed.html      ->  tilia/ui/timelines/lcma/builder/embed.html
-    src/generated/vocab.json   ->  tilia/ui/timelines/lcma/vocab.json
+    dist-embed/embed.html          ->  tilia/ui/timelines/lcma/builder/embed.html
+    dist-validator/validator.html  ->  tilia/ui/timelines/lcma/validator/validator.html
+    src/generated/vocab.json       ->  tilia/ui/timelines/lcma/vocab.json
 
-``embed.html`` is the single-file QWebEngine builder; ``vocab.json`` gives ``span_view`` the
-ontology abbreviations. Both are generated, so they drift whenever the annotation-ui ontology
-or builder changes. Keeping them in the repo (rather than building at install time) keeps the
-desktop build self-contained, but it has to be refreshed by hand — this script is that hand.
+``embed.html`` is the single-file QWebEngine builder and ``validator.html`` the headless
+session-wide diagnostics engine (both loaded over file:// in a QWebEngine page); ``vocab.json``
+gives ``span_view`` the ontology abbreviations. All are generated, so they drift whenever the
+annotation-ui ontology or builder changes. Keeping them in the repo (rather than building at
+install time) keeps the desktop build self-contained, but it has to be refreshed by hand — this
+script is that hand.
 
 Next to the assets it writes ``builder/SOURCE.txt`` — the annotation-ui commit the bundle was
 built from and whether that source tree was dirty — so a vendored file is traceable to a source
@@ -40,15 +43,23 @@ FORK_ROOT = Path(__file__).resolve().parent.parent
 # (path of the artifact within the annotation-ui repo, destination within this fork)
 ASSETS = [
     ("dist-embed/embed.html", FORK_ROOT / "tilia/ui/timelines/lcma/builder/embed.html"),
+    (
+        "dist-validator/validator.html",
+        FORK_ROOT / "tilia/ui/timelines/lcma/validator/validator.html",
+    ),
     ("src/generated/vocab.json", FORK_ROOT / "tilia/ui/timelines/lcma/vocab.json"),
 ]
 
 # Provenance manifest written next to the assets: which annotation-ui commit they came from.
+# The embed and validator bundles are vendored from the same source tree in one run, so both
+# directories get the same stamp (each vendored dir stays self-describing).
 PROVENANCE_FILE = FORK_ROOT / "tilia/ui/timelines/lcma/builder/SOURCE.txt"
+PROVENANCE_FILE_VALIDATOR = FORK_ROOT / "tilia/ui/timelines/lcma/validator/SOURCE.txt"
 
 # Commands that (re)generate the artifacts above, run in the annotation-ui repo with --build.
 BUILD_COMMANDS = [
     ["npm", "run", "build:embed"],  # -> dist-embed/embed.html
+    ["npm", "run", "build:validator"],  # -> dist-validator/validator.html
     ["npm", "run", "ontology:gen"],  # -> src/generated/vocab.json
 ]
 
@@ -192,6 +203,7 @@ def main() -> int:
         _report_provenance(prov)
     else:
         write_provenance(prov)
+        write_provenance(prov, PROVENANCE_FILE_VALIDATOR)
         flag = "dirty" if prov["dirty"] == "true" else "clean"
         print(
             f"[provenance] {PROVENANCE_FILE.relative_to(FORK_ROOT)}  ->  "
