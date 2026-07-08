@@ -231,11 +231,19 @@ class LcmaFormUI(HierarchyUI):
 
 
 class LcmaFormBody(HierarchyBody):
-    """A hierarchy body that draws a dashed border when its unit's function is *notional*
-    (the render contract's ``.is-notional`` channel — a function the analyst marks as implied,
-    not literally present). Selection still shows the solid pen; on deselect the body returns
-    to the dashed border instead of no border, so the channel survives select/deselect.
+    """A hierarchy body that always carries a contour, so adjacent pale family-tint spans stay
+    visually separable (plain hierarchies rely on saturated fills and can go borderless; the LCMA
+    fills are low-opacity tints over white and would otherwise bleed together). A *notional*
+    function ("…") upgrades the contour to a dashed border (the render contract's ``.is-notional``
+    channel — a function the analyst marks as implied, not literally present). Selection still
+    shows the solid black pen; on deselect the body returns to its contour / dashed border, so
+    both channels survive select/deselect.
     """
+
+    # The resting outline: a thin, muted-grey stroke (the web's --muted). Subtle enough not to
+    # compete with the fill, strong enough to delimit neighbouring spans.
+    CONTOUR_COLOR = "#5b6170"
+    CONTOUR_WIDTH = 1
 
     def __init__(self, *args, **kwargs):
         # Must exist before super().__init__, which calls set_pen_style_no_pen().
@@ -244,19 +252,22 @@ class LcmaFormBody(HierarchyBody):
 
     def set_notional(self, notional: bool, selected: bool) -> None:
         self.notional = notional
-        # Don't disturb the solid selection pen; the dashed border is (re)applied on deselect
-        # via HierarchyBody.on_deselect -> set_pen_style_no_pen.
+        # Don't disturb the solid selection pen; the resting contour / dashed border is (re)applied
+        # on deselect via HierarchyBody.on_deselect -> set_pen_style_no_pen.
         if not selected:
             self.set_pen_style_no_pen()
 
-    def set_pen_style_no_pen(self):
-        # "no border" becomes "dashed border" for a notional unit.
+    def set_pen_style_no_pen(self) -> None:
+        # The deselected resting state is never truly "no pen" here: a notional unit gets a dashed
+        # black border, every other unit a thin muted contour.
         if self.notional:
             pen = QPen(QColor("black"))
             pen.setStyle(Qt.PenStyle.DashLine)
-            self.setPen(pen)
         else:
-            super().set_pen_style_no_pen()
+            pen = QPen(QColor(self.CONTOUR_COLOR))
+            pen.setStyle(Qt.PenStyle.SolidLine)
+            pen.setWidth(self.CONTOUR_WIDTH)
+        self.setPen(pen)
 
     @staticmethod
     def get_rect(level: int, start_x: float, end_x: float, tl_height: float):
