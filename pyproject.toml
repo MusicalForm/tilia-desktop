@@ -127,6 +127,9 @@ tilia = [
     "media/player/youtube.css",
     "parsers/score/svg_maker.html",
     "parsers/score/timewise_to_partwise.xsl",
+    "ui/timelines/lcma/builder/embed.html",  # vendored single-file builder webview
+    "ui/timelines/lcma/validator/validator.html",  # vendored single-file headless diagnostics engine
+    "ui/timelines/lcma/vocab.json",  # vendored ontology vocab (abbreviations)
     "ui/fonts/*",
     "ui/icons/*/index.theme",
     "ui/icons/*/actions/256/*",

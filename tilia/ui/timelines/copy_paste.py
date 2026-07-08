@@ -37,9 +37,14 @@ def get_copy_data_from_element(
 
 
 def paste_into_element(element: TimelineUIElement, paste_data: dict[str, Any]):
+    if element is None:
+        return
     for attr, value in paste_data["values"].items():
-        if element is None:
-            pass
+        # Skip attributes the target component does not have, so pasting across timeline
+        # kinds (e.g. an LCMA unit's annotation_data onto a plain hierarchy unit) silently
+        # drops the unsupported attribute instead of raising SetComponentDataError.
+        if not hasattr(element.tl_component, attr):
+            continue
         element.set_data(attr, value)
 
 

@@ -37,29 +37,24 @@ from tilia.file.media_metadata import MediaMetadata
 from tilia.file.tilia_file import TiliaFile
 from tilia.requests import Get, Post, get, listen, post, serve
 from tilia.settings import settings
-from tilia.timelines.timeline_kinds import TimelineKind as TlKind
 from tilia.ui import commands
 from tilia.ui.timelines.collection.collection import TimelineUIs
 from tilia.ui.zoom_toolbar import ZoomToolbar
 from tilia.utils import get_tilia_class_string
 
 from ..media.player import QtAudioPlayer, QtVideoPlayer, YouTubePlayer
+from ..timelines.base.timeline import Timeline
 from .dialog_manager import DialogManager
 from .dialogs.basic import display_error
 from .dialogs.crash import CrashDialog
 from .dialogs.resize_rect import ResizeRect
 from .menubar import TiliaMenuBar
 from .menus import (
-    BeatMenu,
-    HarmonyMenu,
-    HierarchyMenu,
-    MarkerMenu,
-    PdfMenu,
-    ScoreMenu,
     TimelinesMenu,
 )
 from .options_toolbar import OptionsToolbar
 from .player import PlayerToolbar
+from .timelines.base.timeline import TimelineUI
 from .windows.about import About
 from .windows.inspect import Inspect
 from .windows.kinds import WindowKind
@@ -78,7 +73,16 @@ class TiliaMainWindow(QMainWindow):
         self.setAcceptDrops(True)
         self._drop_filter = FileDropEventFilter()
 
-    def install_drop_filter(self):
+    def install_file_drop_filter(self) -> None:
+        # Scope the file-drop filter to the main window, NOT the QApplication.
+        # An application-global Python event filter makes PySide build a Python
+        # wrapper for the *target of every delivered event*; when the LCMA
+        # builder dock's QtWebEngine view churns internal QObjects mid-
+        # destruction, that wrapper build dereferences a freed pointer in
+        # PySide::typeName and segfaults with no traceback (crash on selecting
+        # an LCMA unit). Drag events over children that don't accept drops
+        # propagate up to the main window (which does), so a window-scoped
+        # filter still catches file drops anywhere in the window.
         self.installEventFilter(self._drop_filter)
 
     def changeEvent(self, event: QEvent) -> None:
@@ -95,7 +99,6 @@ class TiliaMainWindow(QMainWindow):
         # leaving every custom icon blank (#475).
         scheme = QApplication.styleHints().colorScheme()
         return "tiliaDark" if scheme == Qt.ColorScheme.Dark else "tiliaLight"
-
 
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
         if event is None:
@@ -212,6 +215,11 @@ class QtUI:
         self._setup_dialog_manager()
         self._setup_menus()
         self._setup_windows()
+        # Must run after every register() call: parents all QActions to the
+        # main window so their shortcuts can fire from context menus, and
+        # resolves shared shortcuts (e.g. range + hierarchy both bind "e"
+        # and "s") into one application-level QShortcut per chord.
+        commands.setup_shortcuts(self.main_window)
 
         self.is_error = False
 
@@ -245,8 +253,8 @@ class QtUI:
             (Post.WINDOW_CLOSE, self.on_window_close),
             (Post.WINDOW_CLOSE_DONE, self.on_window_close_done),
             (Post.REQUEST_CLEAR_UI, self.on_clear_ui),
-            (Post.TIMELINE_KIND_INSTANCED, self.on_timeline_kind_change),
-            (Post.TIMELINE_KIND_NOT_INSTANCED, self.on_timeline_kind_change),
+            (Post.TIMELINE_TYPE_INSTANCED, self.on_timeline_type_change),
+            (Post.TIMELINE_TYPE_NOT_INSTANCED, self.on_timeline_type_change),
             (Post.DISPLAY_ERROR, display_error),
             (Post.UI_EXIT, self.exit),
         }
@@ -308,7 +316,7 @@ class QtUI:
     def _setup_main_window(self, mw: TiliaMainWindow):
         self.main_window = mw
         if os.environ.get("ENVIRONMENT") != "test":
-            self.main_window.install_drop_filter()
+            self.main_window.install_file_drop_filter()
         self._reset_window_title()
 
     @staticmethod
@@ -327,17 +335,10 @@ class QtUI:
         self._setup_dynamic_menus()
 
     def _setup_dynamic_menus(self):
-        menu_info = {
-            (TlKind.MARKER_TIMELINE, MarkerMenu),
-            (TlKind.HIERARCHY_TIMELINE, HierarchyMenu),
-            (TlKind.BEAT_TIMELINE, BeatMenu),
-            (TlKind.HARMONY_TIMELINE, HarmonyMenu),
-            (TlKind.PDF_TIMELINE, PdfMenu),
-            (TlKind.SCORE_TIMELINE, ScoreMenu),
-        }
         self.kind_to_dynamic_menus = {
-            kind: self.menu_bar.get_menu(TimelinesMenu).get_submenu(menu_class)
-            for kind, menu_class in menu_info
+            kind: self.menu_bar.get_menu(TimelinesMenu).get_submenu(kind.menu_class)
+            for kind in TimelineUI.subclasses()
+            if kind.menu_class
         }
         self.update_dynamic_menus()
 
@@ -351,27 +352,25 @@ class QtUI:
         }
 
     def update_dynamic_menus(self):
-        instanced_kinds = [tlui.TIMELINE_KIND for tlui in get(Get.TIMELINE_UIS)]
-        for kind in [
-            TlKind.HIERARCHY_TIMELINE,
-            TlKind.BEAT_TIMELINE,
-            TlKind.MARKER_TIMELINE,
-            TlKind.HARMONY_TIMELINE,
-            TlKind.PDF_TIMELINE,
-            TlKind.SCORE_TIMELINE,
-        ]:
-            if kind in instanced_kinds:
-                self.show_dynamic_menus(kind)
+        # `kind_to_dynamic_menus` is keyed by UI class, but the running
+        # collection knows about backend classes — bridge through
+        # `ui_cls.timeline_class` so the comparison is backend-vs-backend.
+        instanced_backends = {tlui.timeline_class for tlui in get(Get.TIMELINE_UIS)}
+        for ui_cls in TimelineUI.subclasses():
+            if ui_cls.menu_class is None:
+                continue
+            if ui_cls.timeline_class in instanced_backends:
+                self.show_dynamic_menus(ui_cls)
             else:
-                self.hide_dynamic_menus(kind)
+                self.hide_dynamic_menus(ui_cls)
 
-    def show_dynamic_menus(self, kind: TlKind):
-        self.kind_to_dynamic_menus[kind].menuAction().setVisible(True)
+    def show_dynamic_menus(self, ui_cls: type[TimelineUI]):
+        self.kind_to_dynamic_menus[ui_cls].menuAction().setVisible(True)
 
-    def hide_dynamic_menus(self, kind: TlKind):
-        self.kind_to_dynamic_menus[kind].menuAction().setVisible(False)
+    def hide_dynamic_menus(self, ui_cls: type[TimelineUI]):
+        self.kind_to_dynamic_menus[ui_cls].menuAction().setVisible(False)
 
-    def on_timeline_kind_change(self, _: TlKind):
+    def on_timeline_type_change(self, _: type[Timeline]):
         self.update_dynamic_menus()
 
     def on_timeline_set_width(self, value: int) -> None:
@@ -500,8 +499,19 @@ class QtUI:
         return self._windows[kind] is not None
 
     def on_timeline_element_inspect(self):
-        if not get(Get.TIMELINE_ELEMENTS_SELECTED):
+        selected_tluis = get(Get.TIMELINE_ELEMENTS_SELECTED)
+        if not selected_tluis:
             return
+        # An element can opt out of the shared Inspector (INSPECTABLE = False) and edit itself in a
+        # dedicated pane — LCMA units do this in the builder dock. If a selected element exposes
+        # such an editor, focus that instead of raising the (for it, empty) Inspector.
+        for tlui in selected_tluis:
+            for element in tlui.selected_elements:
+                if not getattr(element, "INSPECTABLE", True) and hasattr(
+                    element, "focus_dedicated_editor"
+                ):
+                    element.focus_dedicated_editor()
+                    return
         self.on_window_open(WindowKind.INSPECT)
 
     @staticmethod

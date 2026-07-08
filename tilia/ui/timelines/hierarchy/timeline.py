@@ -2,9 +2,9 @@ import tilia.ui.strings
 import tilia.ui.timelines.copy_paste
 from tilia.requests import Get, Post, get, listen, post
 from tilia.settings import settings
-from tilia.timelines.component_kinds import ComponentKind
-from tilia.timelines.timeline_kinds import TimelineKind
+from tilia.timelines.hierarchy.timeline import HierarchyTimeline
 from tilia.ui import commands
+from tilia.ui.menus import HierarchyMenu
 from tilia.ui.timelines.base.timeline import (
     TimelineUI,
     with_elements,
@@ -28,10 +28,11 @@ from tilia.ui.timelines.hierarchy.key_press_manager import (
 class HierarchyTimelineUI(TimelineUI):
     TOOLBAR_CLASS = HierarchyTimelineToolbar
     ELEMENT_CLASS = HierarchyUI
-    TIMELINE_KIND = TimelineKind.HIERARCHY_TIMELINE
     ACCEPTS_HORIZONTAL_ARROWS = True
     ACCEPTS_VERTICAL_ARROWS = True
     MIN_MARGIN = 10
+    timeline_class = HierarchyTimeline
+    menu_class = HierarchyMenu
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -52,17 +53,23 @@ class HierarchyTimelineUI(TimelineUI):
                 "c",
                 "hierarchy-create-child",
             ),
+            # decrease_level / increase_level: shortcut field is empty
+            # because Ctrl+Up / Ctrl+Down are dispatched via
+            # Post.TIMELINE_KEY_PRESS_CTRL_UP/DOWN (see TimelineView and
+            # TimelineUIs.on_ctrl_arrow_press) instead of being attached
+            # to the QAction. Registering the same shortcut here as well
+            # would produce a Qt "Ambiguous shortcut" warning.
             (
                 "decrease_level",
                 "Move down a level",
-                "Ctrl+Down",
+                "",
                 "hierarchy-level-down",
             ),
             ("group", "Group", "g", "hierarchy-create-parent"),
             (
                 "increase_level",
                 "Move up a level",
-                "Ctrl+Up",
+                "",
                 "hierarchy-level-up",
             ),
             ("merge", "Merge", "e", "hierarchy-merge"),
@@ -192,7 +199,7 @@ class HierarchyTimelineUI(TimelineUI):
         ) + new_parent.tl_component.end
 
         component, _ = self.timeline.create_component(
-            kind=ComponentKind.HIERARCHY,
+            kind=self.timeline.COMPONENT_KIND,
             start=new_child_start,
             end=new_child_end,
             level=child_pastedata_["context"]["level"],
@@ -222,8 +229,11 @@ class HierarchyTimelineUI(TimelineUI):
                 children_of_element.append(child_component)
 
     def get_copy_data_from_hierarchy_ui(self, hierarchy_ui: HierarchyUI):
+        # Use the element's OWN copy attributes, not HierarchyUI's, so a subclass (e.g.
+        # LcmaFormUI, which adds annotation_data) copies its extra fields instead of silently
+        # dropping them. Behaviour-preserving for plain hierarchies.
         ui_data = get_copy_data_from_element(
-            hierarchy_ui, HierarchyUI.DEFAULT_COPY_ATTRIBUTES
+            hierarchy_ui, hierarchy_ui.DEFAULT_COPY_ATTRIBUTES
         )
 
         if children := hierarchy_ui.get_data("children"):
@@ -240,10 +250,18 @@ class HierarchyTimelineUI(TimelineUI):
     def on_vertical_arrow_press(self, arrow: str):
         HierarchyTimelineUIKeyPressManager(self).on_vertical_arrow_press(arrow)
 
+    def on_ctrl_vertical_arrow_press(self, direction: str) -> None:
+        cmd = (
+            "timeline.hierarchy.increase_level"
+            if direction == "up"
+            else "timeline.hierarchy.decrease_level"
+        )
+        commands.execute(cmd)
+
     def get_max_hierarchy_height(self):
         max_level = max(
             self.timeline.component_manager.get_existing_values_for_attr(
-                "level", ComponentKind.HIERARCHY
+                "level", self.timeline.COMPONENT_KIND
             )
         )
         return HierarchyUI.base_height() + (
@@ -263,7 +281,7 @@ class HierarchyTimelineUI(TimelineUI):
 
         post(
             Post.TIMELINE_ELEMENT_COPY_DONE,
-            {"components": component_data, "timeline_kind": self.timeline.KIND},
+            {"components": component_data, "timeline_type": self.timeline_class},
         )
 
         return True

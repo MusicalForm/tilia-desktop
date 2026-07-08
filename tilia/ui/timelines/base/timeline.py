@@ -67,7 +67,6 @@ def with_elements(func: Callable) -> Callable:
 
 
 class TimelineUI(ABC):  # noqa: B024
-    TIMELINE_KIND = None
     TOOLBAR_CLASS = None
     COPY_PASTE_MANGER_CLASS = None
     DEFAULT_COPY_ATTRIBUTES = CopyAttributes([], [])
@@ -76,6 +75,8 @@ class TimelineUI(ABC):  # noqa: B024
     CONTEXT_MENU_CLASS: type[TimelineUIContextMenu] = TimelineUIContextMenu
     ACCEPTS_VERTICAL_ARROWS = False
     ACCEPTS_HORIZONTAL_ARROWS = False
+    timeline_class = None
+    menu_class = None
 
     def __init__(
         self,
@@ -120,7 +121,16 @@ class TimelineUI(ABC):  # noqa: B024
     def subclasses(cls):
         if not cls.SUBCLASSES_ARE_LOADED:
             cls.ensure_subclasses_are_available()
-        return cls.__subclasses__()
+        # Recursive descent (not just cls.__subclasses__()) so a TimelineUI
+        # defined by subclassing another kind's UI — e.g. an LCMA form UI built
+        # on HierarchyTimelineUI — is discovered too. Pre-order, parents first;
+        # for the existing kinds (all direct children of TimelineUI) this yields
+        # the same list __subclasses__() did.
+        result = []
+        for subclass in cls.__subclasses__():
+            result.append(subclass)
+            result.extend(subclass.subclasses())
+        return result
 
     @classmethod
     def ensure_subclasses_are_available(cls):
@@ -177,15 +187,16 @@ class TimelineUI(ABC):  # noqa: B024
         **kwargs,
     ):
         """
-        Register a command named "timeline.{timeline_kind}.{name}" for this timeline kind
+        Register a command named "timeline.{timeline_type}.{name}" for this timeline kind
         with TimelineUIs.on_timeline_command() as a wrapper for the callback.
         """
-        kind_shortname = cls.TIMELINE_KIND.name.lower().replace("_timeline", "")
+        kind_shortname = cls.timeline_class.type_name().lower()
+        full_name = f"timeline.{kind_shortname}.{name}"
 
         commands.register(
-            f"timeline.{kind_shortname}.{name}",
+            full_name,
             functools.partial(
-                collection.on_timeline_command, cls.TIMELINE_KIND, callback, selector
+                collection.on_timeline_command, cls.timeline_class, callback, selector
             ),
             *args,
             **kwargs,
@@ -229,7 +240,9 @@ class TimelineUI(ABC):  # noqa: B024
         height = self.get_data("height")
         self.scene.set_height(height)
         self.view.set_height(height)
-        self.element_manager.update_time_on_elements()
+        self.collection.update_height()
+        if self.element_manager:
+            self.element_manager.update_time_on_elements()
 
     def update_name(self):
         self.scene.set_text(self.get_data("name"))
@@ -454,7 +467,8 @@ class TimelineUI(ABC):  # noqa: B024
         if hasattr(element, "INSPECTOR_FIELDS") and success:
             stop_listening(element, Post.INSPECTOR_FIELD_EDITED)
 
-            post(Post.INSPECTABLE_ELEMENT_DESELECTED, element.id)
+            if getattr(element, "INSPECTABLE", True):
+                post(Post.INSPECTABLE_ELEMENT_DESELECTED, element.id)
 
         return success
 
@@ -482,7 +496,7 @@ class TimelineUI(ABC):  # noqa: B024
     def display_timeline_context_menu(self, x: int, y: int):
         if not self.CONTEXT_MENU_CLASS:
             return
-        self.CONTEXT_MENU_CLASS(self).exec(QPoint(x, y))
+        self.CONTEXT_MENU_CLASS(self, x, y).exec(QPoint(x, y))
 
     def on_window_open_done(self, kind: WindowKind):
         if kind != WindowKind.INSPECT:
@@ -492,6 +506,12 @@ class TimelineUI(ABC):  # noqa: B024
 
     @staticmethod
     def post_inspectable_selected_event(element):
+        if not getattr(element, "INSPECTABLE", True):
+            # Element opts out of the shared Inspector (it has its own editor). The
+            # INSPECTOR_FIELD_EDITED listen in select_element stays, so that editor can
+            # still drive edits through the validated path.
+            return
+
         if not hasattr(element, "INSPECTOR_FIELDS") or not hasattr(
             element, "get_inspector_dict"
         ):
@@ -561,7 +581,7 @@ class TimelineUI(ABC):  # noqa: B024
     def __str__(self):
         return (
             f"{self.get_data('name') if self.timeline else '<unavailable>'} |"
-            f" {self.TIMELINE_KIND.value.capitalize().split('_')[0]} Timeline"
+            f" {self.timeline_class.type_name()} timeline"
         )
 
     def update_element_order(self, element: T):
@@ -589,7 +609,7 @@ class TimelineUI(ABC):  # noqa: B024
 
         post(
             Post.TIMELINE_ELEMENT_COPY_DONE,
-            {"components": component_data, "timeline_kind": self.timeline.KIND},
+            {"components": component_data, "timeline_type": self.timeline_class},
         )
         return True
 

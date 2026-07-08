@@ -23,13 +23,11 @@ from tilia.requests import Get, Post, get, listen, post, serve
 from tilia.settings import settings
 from tilia.timelines.base.timeline import Timeline, TimelineFlag
 from tilia.timelines.component_kinds import ComponentKind
-from tilia.timelines.timeline_kinds import (
-    TimelineKind,
-    get_timeline_name,
-)
-from tilia.timelines.timeline_kinds import (
-    TimelineKind as TlKind,
-)
+from tilia.timelines.harmony.timeline import HarmonyTimeline
+from tilia.timelines.hierarchy.timeline import HierarchyTimeline
+from tilia.timelines.pdf.timeline import PdfTimeline
+from tilia.timelines.score.timeline import ScoreTimeline
+from tilia.timelines.slider.timeline import SliderTimeline
 from tilia.ui import commands
 from tilia.ui.coords import time_x_converter
 from tilia.ui.dialogs.choose import ChooseDialog
@@ -78,9 +76,11 @@ class TimelineUIs:
         main_window: QMainWindow,
     ):
 
+        from tilia.timelines.slider.timeline import SliderTimeline
+
         self.main_window = main_window
         self.kind_to_toolbar = {
-            kind: None for kind in TimelineKind if kind != TlKind.SLIDER_TIMELINE
+            kind: None for kind in Timeline.subclasses() if kind != SliderTimeline
         }
 
         self._timeline_uis: set[TimelineUI] = set()
@@ -138,31 +138,41 @@ class TimelineUIs:
 
     def _setup_commands(self):
         for cls in TimelineUI.subclasses():
-            kind = cls.TIMELINE_KIND
-            name = get_timeline_name(kind)
-            if kind != TlKind.SLIDER_TIMELINE:
-                if kind == TlKind.HARMONY_TIMELINE:
+            backend = cls.timeline_class
+            name = backend.type_name().lower()
+            if backend is not SliderTimeline:
+                # Qt uses `&` to mark the next character as the menu accelerator
+                # (the underlined letter the Alt-shortcut targets). A kind may set
+                # ADD_MENU_TEXT to control its label (e.g. the "LCMA" acronym); most
+                # kinds take the first letter; harmony already collides with
+                # "Hierarchy" so we put the accelerator on the second letter
+                # ("H&armony"), and "PDF" is fully uppercased.
+                if backend.ADD_MENU_TEXT is not None:
+                    text = backend.ADD_MENU_TEXT
+                elif backend is HarmonyTimeline:
                     text = name[0].upper() + "&" + name[1:]
-                elif kind == TlKind.PDF_TIMELINE:
+                elif backend is PdfTimeline:
                     text = "&" + name.upper()
                 else:
                     text = "&" + name.capitalize()
 
                 commands.register(
                     f"timelines.add.{name}",
-                    functools.partial(self.on_timeline_add, kind),
+                    functools.partial(self.on_timeline_add, backend),
                     text,
                 )
 
-            if kind in Timeline.get_kinds_by_flag(TimelineFlag.COMPONENTS_IMPORTABLE):
-                if kind == TimelineKind.SCORE_TIMELINE:
+            if backend in Timeline.get_kinds_by_flag(
+                TimelineFlag.COMPONENTS_IMPORTABLE
+            ):
+                if backend is ScoreTimeline:
                     text = "&Import from MusicXML"
                 else:
                     text = "&Import from CSV file"
 
                 commands.register(
                     f"timelines.import.{name}",
-                    functools.partial(self.on_import_to_timeline, kind),
+                    functools.partial(self.on_import_to_timeline, backend),
                     text,
                 )
 
@@ -182,7 +192,7 @@ class TimelineUIs:
         commands.register(
             "timeline.set_name",
             self.on_timeline_set_name,
-            "Set name",
+            "Set timeline name",
         )
 
         commands.register(
@@ -256,7 +266,7 @@ class TimelineUIs:
 
     def on_timeline_command(
         self,
-        kind: TimelineKind | list[TimelineKind],
+        kind: type[Timeline] | list[type[Timeline]],
         callback: Callable | str,
         selector: TimelineSelector,
         *args,
@@ -270,7 +280,7 @@ class TimelineUIs:
         Records state so the user can undo/redo the command.
         """
 
-        if isinstance(kind, TimelineKind):
+        if isinstance(kind, type(Timeline)):
             kind = [kind]
 
         # Passing method names is allowed to enable calling methods overridden by TimelineUI subclasses,
@@ -343,7 +353,7 @@ class TimelineUIs:
             return True
         return False
 
-    def on_timeline_add(self, kind: TimelineKind, name: str | None = None):
+    def on_timeline_add(self, cls: type[Timeline], name: str | None = None):
         def _get_media_is_loaded():
             if get(Get.MEDIA_DURATION) == 0:
                 return False
@@ -367,15 +377,17 @@ class TimelineUIs:
                 return False
 
         kwargs = dict()
-        cls = self.get_timeline_ui_class(kind)
-        if hasattr(cls, "get_additional_args_for_creation"):
-            success, additional_args = cls.get_additional_args_for_creation()
+        # The hook is defined on the UI class (it issues UI prompts), but
+        # `cls` here is the backend timeline class — look the UI class up.
+        ui_cls = self.get_timeline_ui_class(cls)
+        if hasattr(ui_cls, "get_additional_args_for_creation"):
+            success, additional_args = ui_cls.get_additional_args_for_creation()
             if not success:
                 return False
             kwargs |= additional_args
 
         get(Get.TIMELINE_COLLECTION).create_timeline(
-            kind=kind, components=None, name=name, **kwargs
+            kind=cls, components=None, name=name, **kwargs
         )
 
         post(Post.APP_STATE_RECORD, f"timelines command: timeline add {name}")
@@ -425,6 +437,7 @@ class TimelineUIs:
             (Post.TIMELINE_VIEW_LEFT_BUTTON_DRAG, self._on_timeline_ui_left_drag),
             (Post.TIMELINE_VIEW_LEFT_BUTTON_RELEASE, self.on_timeline_ui_left_released),
             (Post.TIMELINE_VIEW_RIGHT_CLICK, self._on_timeline_ui_right_click),
+            (Post.SHARED_SHORTCUT_FIRED, self.on_shared_shortcut_fired),
             (Post.TIMELINES_AUTO_SCROLL_UPDATE, self.set_auto_scroll),
             (
                 Post.TIMELINE_KEY_PRESS_DOWN,
@@ -438,6 +451,14 @@ class TimelineUIs:
             (
                 Post.TIMELINE_KEY_PRESS_LEFT,
                 functools.partial(self.on_arrow_press, "left"),
+            ),
+            (
+                Post.TIMELINE_KEY_PRESS_CTRL_UP,
+                functools.partial(self.on_ctrl_arrow_press, "up"),
+            ),
+            (
+                Post.TIMELINE_KEY_PRESS_CTRL_DOWN,
+                functools.partial(self.on_ctrl_arrow_press, "down"),
             ),
             (Post.ELEMENT_DRAG_END, lambda: self.set_is_dragging(False)),
             (Post.ELEMENT_DRAG_START, lambda: self.set_is_dragging(True)),
@@ -471,7 +492,7 @@ class TimelineUIs:
             (Post.IMPORT_CSV, self.on_import_to_timeline),
             (
                 Post.IMPORT_MUSICXML,
-                functools.partial(self.on_import_to_timeline, TlKind.SCORE_TIMELINE),
+                functools.partial(self.on_import_to_timeline, ScoreTimeline),
             ),
             (Post.TIMELINE_UIS_VIEW_FOCUS_OUT, self.clear_selection_boxes),
             (Post.PLAYER_DURATION_AVAILABLE, self._on_duration_available),
@@ -500,7 +521,7 @@ class TimelineUIs:
         for request, callback in SERVES:
             serve(self, request, callback)
 
-    def create_timeline_ui(self, kind: TlKind, id: int) -> TimelineUI:
+    def create_timeline_ui(self, kind: type[Timeline], id: int) -> TimelineUI:
         timeline_class = self.get_timeline_ui_class(kind)
         w = get(Get.TIMELINE_WIDTH)
         h = get(Get.TIMELINE, id).get_data("height")
@@ -528,7 +549,7 @@ class TimelineUIs:
 
     def on_timeline_component_created(
         self,
-        _: TlKind,
+        _: type[Timeline],
         tl_id: int,
         component_kind: ComponentKind,
         component_id: int,
@@ -539,7 +560,9 @@ class TimelineUIs:
             component_kind, component_id, get_data, set_data
         )
 
-    def on_timeline_component_deleted(self, _: TlKind, tl_id: int, component_id: int):
+    def on_timeline_component_deleted(
+        self, _: type[Timeline], tl_id: int, component_id: int
+    ):
         if (tl_id, component_id) in self.loop_elements:
             if (tl_id, component_id) not in self.loop_delete_ignore:
                 self.loop_elements.remove((tl_id, component_id))
@@ -589,6 +612,7 @@ class TimelineUIs:
 
     def _add_to_timeline_ui_select_order(self, tl_ui: TimelineUI) -> None:
         self._select_order.insert(0, tl_ui)
+        post(Post.TIMELINE_UI_SELECTED, tl_ui)
 
     def _remove_from_timeline_ui_select_order(self, tl_ui: TimelineUI) -> None:
         try:
@@ -602,6 +626,7 @@ class TimelineUIs:
     def _send_to_top_of_select_order(self, tl_ui: TimelineUI):
         self._select_order.remove(tl_ui)
         self._select_order.insert(0, tl_ui)
+        post(Post.TIMELINE_UI_SELECTED, tl_ui)
 
     def add_timeline_view_to_scene(self, view: TimelineView, ordinal: int) -> None:
         y = sum(tlui.get_data("height") for tlui in sorted(self)[: ordinal - 1])
@@ -632,14 +657,14 @@ class TimelineUIs:
             self.change_playback_line_position(tl_ui, time)
 
     def update_toolbar_visibility(self):
-        visible_tl_kinds = {
-            tlui.TIMELINE_KIND for tlui in self if tlui.get_data("is_visible")
+        visible_tl_types = {
+            tlui.timeline_class for tlui in self if tlui.get_data("is_visible")
         }
         for kind, toolbar in self.kind_to_toolbar.items():
             toolbar: TimelineToolbar
             if not toolbar:
                 continue
-            toolbar.show() if kind in visible_tl_kinds else toolbar.hide()
+            toolbar.show() if kind in visible_tl_types else toolbar.hide()
 
     def get_scene_height(self):
         return sum(
@@ -657,16 +682,16 @@ class TimelineUIs:
 
     @staticmethod
     def update_timeline_times(tlui: TimelineUI):
-        if tlui.TIMELINE_KIND == TlKind.SLIDER_TIMELINE:
+        if tlui.timeline_class is SliderTimeline:
             tlui = cast(SliderTimelineUI, tlui)
             tlui.update_items_position()
         else:
             tlui.element_manager.update_time_on_elements()
 
     @staticmethod
-    def get_timeline_ui_class(kind: TlKind) -> type[TimelineUI]:
+    def get_timeline_ui_class(kind: type[Timeline]) -> type[TimelineUI]:
         for cls in TimelineUI.subclasses():
-            if cls.TIMELINE_KIND == kind:
+            if cls.timeline_class is kind:
                 return cls
 
         raise ValueError(f"No TimelineUI class found for kind: {kind}")
@@ -685,17 +710,17 @@ class TimelineUIs:
     def create_timeline_view(scene: TimelineScene) -> TimelineView:
         return TimelineView(scene)
 
-    def setup_toolbar(self, tl_kind: TimelineKind):
-        tl_class = self.get_timeline_ui_class(tl_kind)
+    def setup_toolbar(self, tl_type: type[Timeline]):
+        tl_class = self.get_timeline_ui_class(tl_type)
         if not tl_class.TOOLBAR_CLASS:
             return
 
-        if toolbar := self.kind_to_toolbar[tl_kind]:
+        if toolbar := self.kind_to_toolbar[tl_type]:
             toolbar.show()
         else:
             toolbar = tl_class.TOOLBAR_CLASS()
             self.main_window.addToolBar(toolbar)
-            self.kind_to_toolbar[tl_kind] = toolbar
+            self.kind_to_toolbar[tl_type] = toolbar
 
     def _get_timeline_ui_by_scene(self, scene):
         return next((tlui for tlui in self if tlui.scene == scene), None)
@@ -898,6 +923,45 @@ class TimelineUIs:
             if direction == "vertical" and tlui.ACCEPTS_VERTICAL_ARROWS:
                 tlui.on_vertical_arrow_press(arrow)
 
+    def on_ctrl_arrow_press(self, direction: str) -> None:
+        # Dispatch once per kind. Each kind's handler routes through
+        # commands.execute, which uses TimelineSelector.FIRST internally —
+        # firing again per timeline instance would just rerun the command
+        # against the same target.
+        seen_kinds: set[type] = set()
+        for tlui in self:
+            if not tlui.ACCEPTS_VERTICAL_ARROWS:
+                continue
+            kind = type(tlui)
+            if kind in seen_kinds:
+                continue
+            seen_kinds.add(kind)
+            tlui.on_ctrl_vertical_arrow_press(direction)
+
+    def on_shared_shortcut_fired(self, names: tuple[str, ...]) -> None:
+        """Pick the command bound to the most-recently-clicked timeline
+        kind; fire exactly that one. Walks `_select_order` (most-recent
+        first) and matches each tlui against the `timeline.{kind}.{action}`
+        naming convention enforced by `register_timeline_command`.
+
+        If no live timeline matches a bound name and at least one bound
+        name doesn't follow the `timeline.` prefix, surface as an
+        AMBIGUOUS_SHORTCUT error — collisions between non-timeline
+        commands are a configuration bug we want to notice.
+        """
+        for tlui in self._select_order:
+            prefix = f"timeline.{tlui.timeline_class.type_name().lower()}."
+            winner = next((n for n in names if n.startswith(prefix)), None)
+            if winner:
+                commands.execute(winner)
+                return
+
+        if any(not n.startswith("timeline.") for n in names):
+            tilia.errors.display(
+                tilia.errors.AMBIGUOUS_SHORTCUT,
+                f"Non-timeline collision among bound commands: {list(names)}.",
+            )
+
     def on_beat_timeline_measure_number_change_done(self, id: int, start_index: int):
         from tilia.ui.timelines.beat import BeatTimelineUI
 
@@ -911,7 +975,7 @@ class TimelineUIs:
     def on_hierarchy_deselected(self):
         selected_hierarchies = []
         for tlui in self:
-            if tlui.TIMELINE_KIND == TlKind.HIERARCHY_TIMELINE:
+            if tlui.timeline_class is HierarchyTimeline:
                 selected_hierarchies += tlui.selected_elements
         if not selected_hierarchies:
             commands.get_qaction("timeline.component.paste_complete").setVisible(False)
@@ -949,7 +1013,7 @@ class TimelineUIs:
     def on_loop_toggle(self, is_looping):
         if is_looping:
             for tlui in self:
-                if tlui.TIMELINE_KIND == TlKind.HIERARCHY_TIMELINE:
+                if tlui.timeline_class is HierarchyTimeline:
                     self.loop_elements.update(
                         [(tlui.id, element.id) for element in tlui.selected_elements]
                     )
@@ -1093,10 +1157,10 @@ class TimelineUIs:
         return valid
 
     def get_timelines_uis_for_request(
-        self, kinds: list[TlKind], selector: TimelineSelector
+        self, kinds: list[type[Timeline]], selector: TimelineSelector
     ) -> list[TimelineUI]:
-        def get_by_kinds(_kinds: list[TlKind]) -> list[TimelineUI]:
-            return [tlui for tlui in self if tlui.TIMELINE_KIND in _kinds]
+        def get_by_kinds(_kinds: list[type[Timeline]]) -> list[TimelineUI]:
+            return [tlui for tlui in self if tlui.timeline_class in _kinds]
 
         def filter_if_has_selected_elements(
             timeline_uis: list[TimelineUI],
@@ -1109,13 +1173,17 @@ class TimelineUIs:
             for tl_ui in self._select_order:
                 if tl_ui in timeline_uis:
                     return [tl_ui]
+            # No timeline of the requested kind in the select order — return
+            # empty rather than falling off the end (implicit None), so
+            # callers can iterate the result unconditionally.
+            return []
 
         def filter_for_pasting(_) -> list[TimelineUI]:
             clipboard_data = get(Get.CLIPBOARD_CONTENTS)
             if not clipboard_data["components"]:
                 return []
 
-            timeline_uis = get_by_kinds([clipboard_data["timeline_kind"]])
+            timeline_uis = get_by_kinds([clipboard_data["timeline_type"]])
             if any([tlui.has_selected_elements for tlui in timeline_uis]):
                 return filter_if_has_selected_elements(timeline_uis)
             else:
@@ -1250,8 +1318,8 @@ class TimelineUIs:
             )
 
         kinds = [
-            cls.KIND
-            for cls in Timeline.__subclasses__()
+            cls
+            for cls in Timeline.subclasses()
             if components_are_deletable(cls.FLAGS)
         ]
 
@@ -1285,7 +1353,7 @@ class TimelineUIs:
             from tilia.ui.timelines.hierarchy import HierarchyTimelineUI
 
             self.on_timeline_command(
-                TlKind.HIERARCHY_TIMELINE,
+                HierarchyTimeline,
                 HierarchyTimelineUI.on_paste_element_complete,
                 TimelineSelector.PASTE,
                 get(Get.CLIPBOARD_CONTENTS),
@@ -1340,10 +1408,10 @@ class TimelineUIs:
             post(Post.ZOOM_TOOLBAR_UPDATE, zoom)
 
     @command_callback
-    def on_import_to_timeline(self, tl_kind: TlKind):
+    def on_import_to_timeline(self, tl_type: type[Timeline]):
         # Refactor later: merge this with _on_import_to_timeline()
         prev_state = get(Get.APP_STATE)
-        success, errors = _on_import_to_timeline(self, tl_kind)
+        success, errors = _on_import_to_timeline(self, tl_type)
 
         if not success:
             post(Post.APP_STATE_RESTORE, prev_state)
@@ -1413,7 +1481,7 @@ class TimelineUIs:
 
     @staticmethod
     def change_playback_line_position(timeline_ui: TimelineUI, time: float):
-        if timeline_ui.timeline.KIND == TlKind.SLIDER_TIMELINE:
+        if timeline_ui.timeline_class == SliderTimeline:
             return
 
         timeline_ui.scene.set_playback_line_pos(time_x_converter.get_x_by_time(time))
@@ -1433,17 +1501,17 @@ class TimelineUIs:
     @staticmethod
     def kind_to_timeline():
         return {
-            kind: len([tl for tl in get(Get.TIMELINES) if tl.KIND == kind])
-            for kind in TlKind
+            kind: len([tl for tl in get(Get.TIMELINES) if isinstance(tl, kind)])
+            for kind in Timeline.subclasses()
         }
 
     def _hide_toolbar_if_needed(self, timeline_ui: TimelineUI):
         if not timeline_ui.TOOLBAR_CLASS:
             return
-        if self.kind_to_timeline()[timeline_ui.TIMELINE_KIND] == 0:
-            self.kind_to_toolbar[timeline_ui.TIMELINE_KIND].hide()
+        if self.kind_to_timeline()[timeline_ui.timeline_class] == 0:
+            self.kind_to_toolbar[timeline_ui.timeline_class].hide()
 
-    def _show_toolbar(self, kind: TlKind):
+    def _show_toolbar(self, kind: type[Timeline]):
         self.kind_to_toolbar[kind].show()
 
     def get_selected_time(self):
@@ -1467,16 +1535,20 @@ class TimelineUIs:
     def get_timeline_uis_by_attr(self, attr: str, value: Any) -> list[TimelineUI]:
         return [tlui for tlui in self if getattr(tlui, attr) == value]
 
-    def get_first_timeline_ui_in_select_order(self, kind: TimelineKind):
+    def get_timeline_uis_by_type(self, tl_type: type[Timeline]) -> list[TimelineUI]:
+        return [tlui for tlui in self if tlui.timeline_class is tl_type]
+
+    def get_first_timeline_ui_in_select_order(self, kind: type[Timeline]):
         return next(
-            (tlui for tlui in self._select_order if tlui.get_data("KIND") == kind), None
+            (tlui for tlui in self._select_order if isinstance(tlui.timeline, kind)),
+            None,
         )
 
     def _get_choose_timeline_dialog(
         self,
         title: str,
         prompt: str,
-        kind: TlKind | list[TlKind] | None = None,
+        kind: type[Timeline] | list[type[Timeline]] | None = None,
     ) -> ChooseDialog:
         if kind and not isinstance(kind, list):
             kind = [kind]
@@ -1484,7 +1556,7 @@ class TimelineUIs:
         options = [
             (str(tlui), tlui)
             for tlui in sorted(self)
-            if ((tlui.TIMELINE_KIND in kind) if kind else True)
+            if ((tlui.timeline_class in kind) if kind else True)
         ]
 
         return ChooseDialog(self.main_window, title, prompt, options)
@@ -1493,7 +1565,7 @@ class TimelineUIs:
         self,
         title: str,
         prompt: str,
-        kind: TlKind | list[TlKind] | None = None,
+        kind: type[Timeline] | list[type[Timeline]] | None = None,
     ) -> Timeline | None:
         """
         Opens a dialog where the user may choose an existing timeline.
@@ -1515,7 +1587,7 @@ class TimelineUIs:
     def on_component_event(
         self,
         event: Post,
-        _: TlKind,
+        _: type[Timeline],
         tl_id: int,
         component_id: int,
         *args,
@@ -1533,7 +1605,7 @@ class TimelineUIs:
 
         event_to_callback[event](tlui, *args, **kwargs)
 
-    def on_timeline_created(self, kind: TlKind, id: int):
+    def on_timeline_created(self, kind: type[Timeline], id: int):
         self.create_timeline_ui(kind, id)
 
     def on_timeline_deleted(self, id: int):

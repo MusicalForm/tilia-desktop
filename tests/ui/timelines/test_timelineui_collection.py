@@ -11,12 +11,9 @@ from tilia.file.common import are_tilia_data_equal
 from tilia.media.player.base import MediaTimeChangeReason
 from tilia.requests import Get, Post, get, post
 from tilia.settings import settings
-from tilia.timelines.timeline_kinds import (
-    TimelineKind,
-)
-from tilia.timelines.timeline_kinds import (
-    TimelineKind as TlKind,
-)
+from tilia.timelines.hierarchy.timeline import HierarchyTimeline
+from tilia.timelines.marker.timeline import MarkerTimeline
+from tilia.timelines.slider.timeline import SliderTimeline
 from tilia.ui import commands
 from tilia.ui.coords import time_x_converter
 from tilia.ui.dialogs.add_timeline_without_media import AddTimelineWithoutMedia
@@ -47,6 +44,20 @@ class TestTimelineUICreation:
         ):
             commands.execute(command)
         assert len(tluis) == 1
+
+    def test_beat_creation_uses_pattern_from_user_prompt(self, tluis):
+        # Regression: the kind-refactor passed the backend Timeline class to
+        # on_timeline_add, so `hasattr(ui_cls, "get_additional_args_for_creation")`
+        # was being checked on the backend class instead of the UI class and
+        # silently returned False, leaving the beat pattern at its default.
+        # Make sure the prompted value actually reaches the timeline.
+        prompted_pattern = [3, 2]
+        with (
+            Serve(Get.FROM_USER_BEAT_PATTERN, (True, prompted_pattern)),
+            Serve(Get.FROM_USER_STRING, (True, "")),
+        ):
+            commands.execute("timelines.add.beat")
+        assert tluis[0].timeline.beat_pattern == prompted_pattern
 
     def test_create_multiple(self, tilia_state, tluis):
         create_actions = [
@@ -124,9 +135,9 @@ class TestTimelineUICreation:
         assert tls.is_empty
 
     def test_update_select_order(self, tls, tluis):
-        tl1 = tls.create_timeline(TlKind.HIERARCHY_TIMELINE, name="test1")
+        tl1 = tls.create_timeline(HierarchyTimeline, name="test1")
 
-        tl2 = tls.create_timeline(TlKind.HIERARCHY_TIMELINE, name="test2")
+        tl2 = tls.create_timeline(HierarchyTimeline, name="test2")
 
         tlui1 = tluis.get_timeline_ui(tl1.id)
         tlui2 = tluis.get_timeline_ui(tl2.id)
@@ -147,12 +158,12 @@ class TestServe:
         assert not get(Get.TIMELINE_ELEMENTS_SELECTED)
 
     def test_serve_timeline_elements_selected_case_false(self, tls, tluis):
-        tls.create_timeline(TimelineKind.HIERARCHY_TIMELINE)
+        tls.create_timeline(HierarchyTimeline)
 
         assert not get(Get.TIMELINE_ELEMENTS_SELECTED)
 
     def test_serve_timeline_elements_selected_case_true(self, tls, tluis):
-        tls.create_timeline(TimelineKind.HIERARCHY_TIMELINE)
+        tls.create_timeline(HierarchyTimeline)
         tluis[0].select_all_elements()
 
         assert get(Get.TIMELINE_ELEMENTS_SELECTED)
@@ -160,16 +171,16 @@ class TestServe:
     def test_serve_timeline_elements_selected_case_false_multiple_timelines(
         self, tls, tluis
     ):
-        tls.create_timeline(TimelineKind.HIERARCHY_TIMELINE)
-        tls.create_timeline(TimelineKind.HIERARCHY_TIMELINE)
-        tls.create_timeline(TimelineKind.HIERARCHY_TIMELINE)
+        tls.create_timeline(HierarchyTimeline)
+        tls.create_timeline(HierarchyTimeline)
+        tls.create_timeline(HierarchyTimeline)
 
         assert not get(Get.TIMELINE_ELEMENTS_SELECTED)
 
     def test_serve_timeline_elements_selected_case_true_multiple_tls(self, tls, tluis):
-        tls.create_timeline(TimelineKind.HIERARCHY_TIMELINE)
-        tls.create_timeline(TimelineKind.HIERARCHY_TIMELINE)
-        tls.create_timeline(TimelineKind.HIERARCHY_TIMELINE)
+        tls.create_timeline(HierarchyTimeline)
+        tls.create_timeline(HierarchyTimeline)
+        tls.create_timeline(HierarchyTimeline)
         tluis[2].select_all_elements()
 
         assert get(Get.TIMELINE_ELEMENTS_SELECTED)
@@ -251,13 +262,13 @@ class TestAutoScroll:
 
 
 def test_set_timeline_height_updates_playback_line_height(tls, tluis):
-    tls.create_timeline(TimelineKind.MARKER_TIMELINE)
+    tls.create_timeline(MarkerTimeline)
     tls.set_timeline_data(tls[0].id, "height", 100)
     assert tluis[0].scene.playback_line.line().dy() == 100
 
 
 def test_zooming_updates_playback_line_position(tls, tluis):
-    tls.create_timeline(TimelineKind.MARKER_TIMELINE)
+    tls.create_timeline(MarkerTimeline)
     commands.execute("media.seek", 50)
     commands.execute("view.zoom.in")
     assert tluis[0].scene.playback_line.line().x1() == pytest.approx(
@@ -283,6 +294,30 @@ class TestSeek:
         target_x = time_x_converter.get_x_by_time(60)
         drag_mouse_in_timeline_view(target_x, y)
         assert marker_tlui.playback_line.line().x1() == target_x
+
+    def test_slider_drag_release_seeks_media(
+        self, marker_tlui, slider_tlui, tilia_state
+    ):
+        # Regression: dragging the trough used to post Post.PLAYER_SEEK on
+        # release, which had no listeners, so the media position never
+        # actually moved (only the visual playback lines did, via
+        # SLIDER_DRAG). The fix routes the release through `media.seek`.
+        y = slider_tlui.trough.pos().y()
+        click_timeline_ui(slider_tlui, 0, y=y)
+        target_x = time_x_converter.get_x_by_time(60)
+        drag_mouse_in_timeline_view(target_x, y)
+        assert tilia_state.current_time == pytest.approx(60)
+
+    def test_slider_click_seeks_media(self, marker_tlui, slider_tlui, tilia_state):
+        # Companion to the drag-release regression: the click path used
+        # `commands.execute("media.seek", ...)` already and was never
+        # broken — pin it so a future refactor can't break both at once.
+        # Click the line itself (centre y of the view), not the trough's y.
+        line_y = slider_tlui.view.height() / 2
+        target_x = time_x_converter.get_x_by_time(40)
+        click_timeline_ui(slider_tlui, 40, y=line_y)
+        assert tilia_state.current_time == pytest.approx(40)
+        assert marker_tlui.playback_line.line().x1() == pytest.approx(target_x)
 
     @pytest.mark.parametrize(
         "tlui,request_to_serve, add_request",
@@ -464,7 +499,7 @@ class TestClearAllTimelines:
         assert tluis.is_empty
 
     def test_non_clearable_timeline(self, tilia, tls, tluis):
-        tls.create_timeline(TimelineKind.SLIDER_TIMELINE)
+        tls.create_timeline(SliderTimeline)
         commands.execute("timelines.clear_all")
 
     def test_timelines_are_empty(self, tilia, tls, tluis):
@@ -473,7 +508,7 @@ class TestClearAllTimelines:
         commands.execute("timelines.clear_all")
 
     def test_not_clearable_and_empty_timeline(self, tilia, tls, tluis):
-        tls.create_timeline(TimelineKind.SLIDER_TIMELINE)
+        tls.create_timeline(SliderTimeline)
         commands.execute("timelines.add.marker", name="")
         commands.execute("timelines.clear_all")
 
@@ -593,7 +628,7 @@ def test_timeline_command_fails(tilia, qtui, tluis, marker_tlui, tilia_errors):
 
     callback = functools.partial(
         tluis.on_timeline_command,
-        TimelineKind.MARKER_TIMELINE,
+        MarkerTimeline,
         "add_and_fail",
         TimelineSelector.ALL,
     )

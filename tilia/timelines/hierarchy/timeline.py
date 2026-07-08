@@ -12,7 +12,6 @@ from tilia.timelines.base.component.segmentlike import (
     scale_segmentlike,
 )
 from tilia.timelines.component_kinds import ComponentKind
-from tilia.timelines.timeline_kinds import TimelineKind
 
 from ...ui.format import format_media_time
 from ..base.timeline import Timeline, TimelineComponentManager, TimelineFlag
@@ -21,14 +20,14 @@ from .components import Hierarchy
 
 class HierarchyTLComponentManager(TimelineComponentManager):
     def __init__(self, timeline: HierarchyTimeline):
-        super().__init__(timeline, [ComponentKind.HIERARCHY])
+        super().__init__(timeline, [timeline.COMPONENT_KIND])
         self.scale = functools.partial(scale_segmentlike, self)
         self.crop = functools.partial(crop_segmentlike, self)
 
     def _validate_component_creation(
         self, _, start: float, end: float, level: int, **kwargs
     ):
-        return Hierarchy.validate_creation(
+        return self.timeline.COMPONENT_CLASS.validate_creation(
             start, end, (start, end, level), {(c.start, c.end, c.level) for c in self}
         )
 
@@ -119,7 +118,7 @@ class HierarchyTLComponentManager(TimelineComponentManager):
 
         # create new child
         created_unit, fail_reason = self.timeline.create_component(
-            kind=ComponentKind.HIERARCHY,
+            kind=self.timeline.COMPONENT_KIND,
             start=hierarchy.start,
             end=hierarchy.end,
             level=hierarchy.level - 1,
@@ -223,7 +222,7 @@ class HierarchyTLComponentManager(TimelineComponentManager):
             return success, reason
 
         hierarchies += self.get_components_by_condition(
-            is_between_grouped_units, kind=ComponentKind.HIERARCHY
+            is_between_grouped_units, kind=self.timeline.COMPONENT_KIND
         )
 
         grouping_unit_level = max([unit.level for unit in hierarchies]) + 1
@@ -235,7 +234,7 @@ class HierarchyTLComponentManager(TimelineComponentManager):
             return success, reason
 
         grouping_unit, fail_reason = self.timeline.create_component(
-            kind=ComponentKind.HIERARCHY,
+            kind=self.timeline.COMPONENT_KIND,
             start=start_time,
             end=end_time,
             level=grouping_unit_level,
@@ -252,7 +251,7 @@ class HierarchyTLComponentManager(TimelineComponentManager):
         strictly before and ends strictly after 'time'
         """
         units_at_time = self.get_components_by_condition(
-            lambda u: u.start < time < u.end, kind=ComponentKind.HIERARCHY
+            lambda u: u.start < time < u.end, kind=self.timeline.COMPONENT_KIND
         )
         units_at_time_sorted_by_time = sorted(units_at_time, key=lambda u: u.level)
         if units_at_time_sorted_by_time:
@@ -302,7 +301,7 @@ class HierarchyTLComponentManager(TimelineComponentManager):
         self.delete_component(unit_to_split)
 
         left_unit, fail_reason = self.timeline.create_component(
-            kind=ComponentKind.HIERARCHY,
+            kind=self.timeline.COMPONENT_KIND,
             start=unit_to_split.start,
             end=split_time,
             level=unit_to_split.level,
@@ -312,7 +311,7 @@ class HierarchyTLComponentManager(TimelineComponentManager):
             return False, fail_reason
 
         right_unit, fail_reason = self.timeline.create_component(
-            kind=ComponentKind.HIERARCHY,
+            kind=self.timeline.COMPONENT_KIND,
             start=split_time,
             end=unit_to_split.end,
             level=unit_to_split.level,
@@ -375,7 +374,7 @@ class HierarchyTLComponentManager(TimelineComponentManager):
 
             units_between = self.get_components_by_condition(
                 is_between_selected_units_and_has_same_parent,
-                kind=ComponentKind.HIERARCHY,
+                kind=self.timeline.COMPONENT_KIND,
             )
 
             return list(set(hs + units_between))
@@ -411,7 +410,7 @@ class HierarchyTLComponentManager(TimelineComponentManager):
             self.delete_component(unit)
 
         merger_unit, fail_reason = self.timeline.create_component(
-            kind=ComponentKind.HIERARCHY,
+            kind=self.timeline.COMPONENT_KIND,
             start=hierarchies[0].start,
             end=hierarchies[-1].end,
             level=hierarchies[0].level,
@@ -434,8 +433,12 @@ class HierarchyTLComponentManager(TimelineComponentManager):
 
 
 class HierarchyTimeline(Timeline):
-    KIND = TimelineKind.HIERARCHY_TIMELINE
     COMPONENT_MANAGER_CLASS = HierarchyTLComponentManager
+    # Parameterized so a subclass can be its own timeline/component kind while reusing all the
+    # nested-unit logic in the manager (create_child / group / split / merge query and create by
+    # these instead of a hardcoded ComponentKind.HIERARCHY).
+    COMPONENT_KIND = ComponentKind.HIERARCHY
+    COMPONENT_CLASS = Hierarchy
     FLAGS = [
         TimelineFlag.COMPONENTS_COLORED,
         TimelineFlag.COMPONENTS_COPYABLE,
@@ -473,7 +476,7 @@ class HierarchyTimeline(Timeline):
     def setup_blank_timeline(self):
         """Create unit of level 1 encompassing whole timeline"""
         self.create_component(
-            kind=ComponentKind.HIERARCHY,
+            kind=self.COMPONENT_KIND,
             start=0,
             end=get(Get.MEDIA_DURATION),
             level=1,

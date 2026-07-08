@@ -19,7 +19,7 @@ from tilia.media.loader import load_media
 from tilia.requests import Get, Post, get, listen, post, serve
 from tilia.settings import settings
 from tilia.timelines.collection.collection import Timelines
-from tilia.timelines.timeline_kinds import TimelineKind
+from tilia.timelines.slider.timeline import SliderTimeline
 from tilia.ui import commands
 from tilia.ui.format import format_media_time
 from tilia.ui.strings import SCALE_TIMELINE_PROMPT
@@ -137,14 +137,14 @@ class App:
     def is_file_modified(self) -> bool:
         return self.file_manager.is_file_modified(self.get_app_state())
 
-    def on_open(self, path: Path | str | None = None) -> None:
+    def on_open(self, path: Path | str | None = None) -> bool:
         if isinstance(path, str):
             path = Path(path)
 
         if self.is_file_modified():
             success, should_save = get(Get.FROM_USER_SHOULD_SAVE_CHANGES)
             if not success:
-                return
+                return False
 
             if should_save:
                 commands.execute("file.save")
@@ -152,14 +152,14 @@ class App:
         if not path:
             success, path = get(Get.FROM_USER_TILIA_FILE_PATH)
             if not success:
-                return
+                return False
         prev_state = self.get_app_state()
         self.on_clear()
 
         success, file, old_path = open_tla(path)
         if not success:
             self.on_restore_state(prev_state)
-            return
+            return False
 
         self.old_file_path = old_path
         self.cur_file_path = Path(file.file_path)
@@ -167,11 +167,13 @@ class App:
         success = self.on_file_load(file)
         if not success:
             self.on_restore_state(prev_state)
-            return
+            return False
 
         self.file_manager.file = file
         post(Post.APP_FILE_LOADED, file)
         self.update_recent_files()
+
+        return True
 
     def update_recent_files(self):
         try:
@@ -500,10 +502,8 @@ class App:
 
     def setup_file(self):
         # creates a slider timeline if none was loaded
-        if not get(Get.TIMELINE_COLLECTION).has_timeline_of_kind(
-            TimelineKind.SLIDER_TIMELINE
-        ):
-            self.timelines.create_timeline(TimelineKind.SLIDER_TIMELINE)
+        if not get(Get.TIMELINE_COLLECTION).has_timeline_of_type(SliderTimeline):
+            self.timelines.create_timeline(SliderTimeline)
             self.file_manager.set_timelines(*self.get_timelines_state())
 
         self.reset_undo_manager()

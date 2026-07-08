@@ -1,0 +1,1170 @@
+{
+  "functions": {
+    "specific": [
+      {
+        "name": "after_the_end",
+        "abbr": "ate",
+        "aliases": [
+          "ate"
+        ]
+      },
+      {
+        "name": "antecedent",
+        "abbr": "ant",
+        "aliases": [
+          "ant"
+        ]
+      },
+      {
+        "name": "basic_idea",
+        "abbr": "bi",
+        "aliases": [
+          "bi"
+        ]
+      },
+      {
+        "name": "before_the_beginning",
+        "abbr": "btb",
+        "aliases": [
+          "btb"
+        ]
+      },
+      {
+        "name": "bridge",
+        "abbr": "br",
+        "aliases": [
+          "bridge"
+        ]
+      },
+      {
+        "name": "cadential_subphrase",
+        "abbr": "cad",
+        "aliases": [
+          "cad"
+        ]
+      },
+      {
+        "name": "chorus",
+        "abbr": "ch",
+        "aliases": [
+          "chorus"
+        ]
+      },
+      {
+        "name": "closing_theme",
+        "abbr": "cls",
+        "aliases": [
+          "cls"
+        ]
+      },
+      {
+        "name": "coda",
+        "abbr": "coda",
+        "aliases": []
+      },
+      {
+        "name": "codetta",
+        "abbr": "cdta",
+        "aliases": [
+          "cdta"
+        ]
+      },
+      {
+        "name": "compound_basic_idea",
+        "abbr": "cbi",
+        "aliases": [
+          "cbi"
+        ]
+      },
+      {
+        "name": "consequent",
+        "abbr": "cons",
+        "aliases": [
+          "cons"
+        ]
+      },
+      {
+        "name": "continuation_idea",
+        "abbr": "cont",
+        "aliases": [
+          "cont",
+          "conti",
+          "continuation"
+        ]
+      },
+      {
+        "name": "contrasting_idea",
+        "abbr": "ci",
+        "aliases": [
+          "ci"
+        ]
+      },
+      {
+        "name": "development_section",
+        "abbr": "dev",
+        "aliases": [
+          "dev"
+        ]
+      },
+      {
+        "name": "exposition",
+        "abbr": "exp",
+        "aliases": [
+          "exp"
+        ]
+      },
+      {
+        "name": "fragmentation",
+        "abbr": "frag",
+        "aliases": [
+          "frag"
+        ]
+      },
+      {
+        "name": "interlude",
+        "abbr": "il",
+        "aliases": [
+          "interlude"
+        ]
+      },
+      {
+        "name": "intro",
+        "abbr": "in",
+        "aliases": [
+          "intro"
+        ]
+      },
+      {
+        "name": "introduction",
+        "abbr": "intro",
+        "aliases": [
+          "intro"
+        ]
+      },
+      {
+        "name": "lead_in",
+        "abbr": "lin",
+        "aliases": [
+          "lin"
+        ]
+      },
+      {
+        "name": "link",
+        "abbr": "lk",
+        "aliases": [
+          "link"
+        ]
+      },
+      {
+        "name": "model",
+        "abbr": "mod",
+        "aliases": [
+          "mod"
+        ]
+      },
+      {
+        "name": "movement",
+        "abbr": "mvt",
+        "aliases": [
+          "mvt"
+        ]
+      },
+      {
+        "name": "outro",
+        "abbr": "out",
+        "aliases": [
+          "outro"
+        ]
+      },
+      {
+        "name": "postcadential",
+        "abbr": "pcad",
+        "aliases": [
+          "pcad"
+        ]
+      },
+      {
+        "name": "prechorus",
+        "abbr": "pch",
+        "aliases": [
+          "pre-chorus",
+          "prechorus"
+        ]
+      },
+      {
+        "name": "presentation",
+        "abbr": "pres",
+        "aliases": [
+          "pres"
+        ]
+      },
+      {
+        "name": "primary_theme",
+        "abbr": "pt",
+        "aliases": [
+          "pt"
+        ]
+      },
+      {
+        "name": "primary_theme_zone",
+        "abbr": "ptz",
+        "aliases": [
+          "ptz"
+        ]
+      },
+      {
+        "name": "recapitulation",
+        "abbr": "recap",
+        "aliases": [
+          "recap"
+        ]
+      },
+      {
+        "name": "retransition",
+        "abbr": "rtr",
+        "aliases": [
+          "rtr"
+        ]
+      },
+      {
+        "name": "ritornello",
+        "abbr": "rit",
+        "aliases": [
+          "rit"
+        ]
+      },
+      {
+        "name": "secondary_theme",
+        "abbr": "st",
+        "aliases": [
+          "st"
+        ]
+      },
+      {
+        "name": "secondary_theme_zone",
+        "abbr": "stz",
+        "aliases": [
+          "stz"
+        ]
+      },
+      {
+        "name": "sequence",
+        "abbr": "seq",
+        "aliases": [
+          "seq"
+        ]
+      },
+      {
+        "name": "solo",
+        "abbr": "so",
+        "aliases": [
+          "solo"
+        ]
+      },
+      {
+        "name": "thematic_introduction",
+        "abbr": "ti",
+        "aliases": [
+          "ti"
+        ]
+      },
+      {
+        "name": "transition",
+        "abbr": "tr",
+        "aliases": [
+          "tr"
+        ]
+      },
+      {
+        "name": "verse",
+        "abbr": "v",
+        "aliases": [
+          "verse"
+        ]
+      }
+    ],
+    "cadences": [
+      {
+        "name": "cadence",
+        "abbr": "cad.",
+        "aliases": [
+          "cadence"
+        ]
+      },
+      {
+        "name": "deceptive_cadence",
+        "abbr": "DC",
+        "aliases": [
+          "DC",
+          "deceptive"
+        ]
+      },
+      {
+        "name": "essential_expositional_closure",
+        "abbr": "eec",
+        "aliases": [
+          "eec"
+        ]
+      },
+      {
+        "name": "essential_sonata_closure",
+        "abbr": "esc",
+        "aliases": [
+          "esc"
+        ]
+      },
+      {
+        "name": "hc",
+        "abbr": "HC",
+        "aliases": [
+          "HC"
+        ]
+      },
+      {
+        "name": "iac",
+        "abbr": "IAC",
+        "aliases": [
+          "IAC"
+        ]
+      },
+      {
+        "name": "medial_caesura",
+        "abbr": "MC",
+        "aliases": [
+          "MC"
+        ]
+      },
+      {
+        "name": "pac",
+        "abbr": "PAC",
+        "aliases": [
+          "PAC"
+        ]
+      }
+    ],
+    "generic_units": [
+      {
+        "name": "album",
+        "abbr": "album",
+        "aliases": []
+      },
+      {
+        "name": "cycle",
+        "abbr": "cy",
+        "aliases": [
+          "cycle"
+        ]
+      },
+      {
+        "name": "group",
+        "abbr": "group",
+        "aliases": []
+      },
+      {
+        "name": "idea",
+        "abbr": "idea",
+        "aliases": []
+      },
+      {
+        "name": "movement",
+        "abbr": "movement",
+        "aliases": []
+      },
+      {
+        "name": "part",
+        "abbr": "part",
+        "aliases": []
+      },
+      {
+        "name": "phrase",
+        "abbr": "phrase",
+        "aliases": []
+      },
+      {
+        "name": "section",
+        "abbr": "section",
+        "aliases": []
+      },
+      {
+        "name": "song",
+        "abbr": "song",
+        "aliases": []
+      },
+      {
+        "name": "sub_phrase",
+        "abbr": "sub_phrase",
+        "aliases": []
+      },
+      {
+        "name": "theme",
+        "abbr": "theme",
+        "aliases": []
+      },
+      {
+        "name": "unit",
+        "abbr": "x",
+        "aliases": [
+          "x"
+        ]
+      },
+      {
+        "name": "work",
+        "abbr": "work",
+        "aliases": []
+      },
+      {
+        "name": "zone",
+        "abbr": "zone",
+        "aliases": []
+      }
+    ]
+  },
+  "cardinalities": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "types": {
+    "main": [
+      {
+        "name": "AABA",
+        "abbr": "aaba",
+        "aliases": [
+          "aaba"
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "SRDC",
+        "abbr": "srdc",
+        "aliases": [
+          "srdc"
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "compound_AABA",
+        "abbr": "caaba",
+        "aliases": [
+          "compound",
+          "compound aaba",
+          "compound_aaba"
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "hybrid1",
+        "abbr": "hyb1",
+        "aliases": [
+          "hyb1"
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "hybrid2",
+        "abbr": "hyb2",
+        "aliases": [
+          "hyb2"
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "hybrid3",
+        "abbr": "hyb3",
+        "aliases": [
+          "hyb3"
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "hybrid4",
+        "abbr": "hyb4",
+        "aliases": [
+          "hyb4"
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "period",
+        "abbr": "pd",
+        "aliases": [
+          "pd"
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "repeated_idea",
+        "abbr": "repeated_idea",
+        "aliases": [],
+        "subtypes": []
+      },
+      {
+        "name": "repeated_part",
+        "abbr": "repeated_part",
+        "aliases": [],
+        "subtypes": []
+      },
+      {
+        "name": "repeated_phrase",
+        "abbr": "repeated_phrase",
+        "aliases": [],
+        "subtypes": []
+      },
+      {
+        "name": "repeated_section",
+        "abbr": "repeated_section",
+        "aliases": [],
+        "subtypes": []
+      },
+      {
+        "name": "repeated_subphrase",
+        "abbr": "repeated_subphrase",
+        "aliases": [],
+        "subtypes": []
+      },
+      {
+        "name": "repeated_theme",
+        "abbr": "repeated_theme",
+        "aliases": [],
+        "subtypes": []
+      },
+      {
+        "name": "repeated_zone",
+        "abbr": "repeated_zone",
+        "aliases": [],
+        "subtypes": []
+      },
+      {
+        "name": "ritornello_form",
+        "abbr": "ritornello",
+        "aliases": [
+          "ritornello"
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "rondo_form",
+        "abbr": "rondo",
+        "aliases": [
+          "rondo"
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "rounded_binary",
+        "abbr": "rounded_binary",
+        "aliases": [],
+        "subtypes": []
+      },
+      {
+        "name": "sentence",
+        "abbr": "sent",
+        "aliases": [
+          "sent"
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "sequence",
+        "abbr": "seq",
+        "aliases": [
+          "seq"
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "simple_binary",
+        "abbr": "simple_binary",
+        "aliases": [],
+        "subtypes": [
+          "balanced"
+        ]
+      },
+      {
+        "name": "sonata_form",
+        "abbr": "sonata",
+        "aliases": [
+          "sonata"
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "ternary",
+        "abbr": "ternary",
+        "aliases": [],
+        "subtypes": [
+          "da_capo",
+          "through_composed"
+        ]
+      },
+      {
+        "name": "unary_form",
+        "abbr": "unary",
+        "aliases": [
+          "unary"
+        ],
+        "subtypes": []
+      }
+    ],
+    "subtypes": [
+      {
+        "name": "balanced",
+        "abbr": "balanced",
+        "aliases": []
+      },
+      {
+        "name": "da_capo",
+        "abbr": "da_capo",
+        "aliases": []
+      },
+      {
+        "name": "through_composed",
+        "abbr": "through_composed",
+        "aliases": []
+      }
+    ],
+    "subtypes_by_main": {
+      "simple_binary": [
+        "balanced"
+      ],
+      "ternary": [
+        "da_capo",
+        "through_composed"
+      ]
+    }
+  },
+  "operators": [
+    {
+      "name": "adaptation",
+      "abbr": "°",
+      "aliases": [
+        "adapt"
+      ],
+      "symbol": "°",
+      "string_writable": true
+    },
+    {
+      "name": "augmentation",
+      "abbr": "$aug",
+      "aliases": [
+        "aug"
+      ],
+      "symbol": "$aug",
+      "string_writable": false
+    },
+    {
+      "name": "concatenation",
+      "abbr": ",",
+      "aliases": [
+        "conc"
+      ],
+      "symbol": ",",
+      "string_writable": false
+    },
+    {
+      "name": "diminution",
+      "abbr": "$dim",
+      "aliases": [
+        "dim"
+      ],
+      "symbol": "$dim",
+      "string_writable": false
+    },
+    {
+      "name": "extension",
+      "abbr": "+",
+      "aliases": [
+        "ext"
+      ],
+      "symbol": "+",
+      "string_writable": true
+    },
+    {
+      "name": "interpolation",
+      "abbr": "**",
+      "aliases": [
+        "interp"
+      ],
+      "symbol": "**",
+      "string_writable": false
+    },
+    {
+      "name": "inversion",
+      "abbr": "$inv",
+      "aliases": [
+        "inv"
+      ],
+      "symbol": "$inv",
+      "string_writable": false
+    },
+    {
+      "name": "ornamentation",
+      "abbr": "~",
+      "aliases": [
+        "orn"
+      ],
+      "symbol": "~",
+      "string_writable": true
+    },
+    {
+      "name": "partial",
+      "abbr": "*",
+      "aliases": [
+        "part"
+      ],
+      "symbol": "*",
+      "string_writable": true
+    },
+    {
+      "name": "repetition",
+      "abbr": "!",
+      "aliases": [
+        "rep"
+      ],
+      "symbol": "!",
+      "string_writable": true
+    },
+    {
+      "name": "retrograde",
+      "abbr": "$retr",
+      "aliases": [
+        "retr"
+      ],
+      "symbol": "$retr",
+      "string_writable": false
+    },
+    {
+      "name": "transposition",
+      "abbr": "^",
+      "aliases": [
+        "transp"
+      ],
+      "symbol": "^",
+      "string_writable": true
+    },
+    {
+      "name": "variation",
+      "abbr": "$var",
+      "aliases": [
+        "var"
+      ],
+      "symbol": "$var",
+      "string_writable": false
+    }
+  ],
+  "certainty": [
+    "default",
+    "uncertain"
+  ],
+  "placeholders": [
+    {
+      "name": "repeat",
+      "abbr": "%",
+      "aliases": []
+    }
+  ],
+  "attributes": {
+    "keys": [
+      {
+        "name": "accompaniment",
+        "aliases": [
+          "acc",
+          "accomp"
+        ],
+        "control": "soft",
+        "suggested": [
+          "alberti bass",
+          "arpeggiated",
+          "block chords",
+          "drone",
+          "murky bass",
+          "ostinato",
+          "pedal point",
+          "walking bass"
+        ]
+      },
+      {
+        "name": "articulation",
+        "aliases": [
+          "art",
+          "artic"
+        ],
+        "control": "soft",
+        "suggested": [
+          "legato",
+          "marcato",
+          "portato",
+          "staccato",
+          "tenuto"
+        ]
+      },
+      {
+        "name": "beginsOn",
+        "aliases": [],
+        "control": "controlled",
+        "range": "HarmonicConcept",
+        "values": [
+          {
+            "curie": "harm:Dominant",
+            "label": "dominant"
+          },
+          {
+            "curie": "harm:PreDominant",
+            "label": "pre-dominant"
+          },
+          {
+            "curie": "harm:Tonic",
+            "label": "tonic"
+          }
+        ]
+      },
+      {
+        "name": "character",
+        "aliases": [
+          "affect",
+          "char"
+        ],
+        "control": "soft",
+        "suggested": [
+          "energetic",
+          "lyrical",
+          "march-like",
+          "playful",
+          "solemn",
+          "song-like",
+          "stormy"
+        ]
+      },
+      {
+        "name": "dynamics",
+        "aliases": [
+          "dyn"
+        ],
+        "control": "soft",
+        "suggested": [
+          "crescendo",
+          "diminuendo",
+          "f",
+          "ff",
+          "mf",
+          "mp",
+          "p",
+          "pp",
+          "subito"
+        ]
+      },
+      {
+        "name": "endsWith",
+        "aliases": [],
+        "control": "controlled",
+        "range": "Cadence",
+        "values": [
+          {
+            "curie": "fn:cadence",
+            "label": "cadence"
+          },
+          {
+            "curie": "fn:deceptive_cadence",
+            "label": "deceptive cadence"
+          },
+          {
+            "curie": "fn:essential_expositional_closure",
+            "label": "essential expositional closure"
+          },
+          {
+            "curie": "fn:essential_sonata_closure",
+            "label": "essential sonata closure"
+          },
+          {
+            "curie": "fn:hc",
+            "label": "half cadence"
+          },
+          {
+            "curie": "fn:iac",
+            "label": "imperfect authentic cadence"
+          },
+          {
+            "curie": "fn:medial_caesura",
+            "label": "medial caesura"
+          },
+          {
+            "curie": "fn:pac",
+            "label": "perfect authentic cadence"
+          }
+        ]
+      },
+      {
+        "name": "harmonicProgression",
+        "aliases": [],
+        "control": "controlled",
+        "range": "HarmonicProgression",
+        "values": [
+          {
+            "curie": "lcma:Cadential",
+            "label": "cadential"
+          },
+          {
+            "curie": "lcma:DominantProlongational",
+            "label": "dominant-prolongational"
+          },
+          {
+            "curie": "lcma:Modulating",
+            "label": "modulating"
+          },
+          {
+            "curie": "lcma:Sequential",
+            "label": "sequential"
+          },
+          {
+            "curie": "lcma:TonicProlongational",
+            "label": "tonic-prolongational"
+          }
+        ]
+      },
+      {
+        "name": "harmony",
+        "aliases": [
+          "harm"
+        ],
+        "control": "soft",
+        "suggested": [
+          "chromatic",
+          "diatonic",
+          "modal",
+          "sequential",
+          "static",
+          "tonicizing"
+        ]
+      },
+      {
+        "name": "instrumentation",
+        "aliases": [
+          "instr",
+          "instrumented",
+          "instruments"
+        ],
+        "control": "soft",
+        "range": "Instrument",
+        "values": [
+          {
+            "curie": "lcma:bassoon",
+            "label": "bassoon"
+          },
+          {
+            "curie": "lcma:cello",
+            "label": "cello"
+          },
+          {
+            "curie": "lcma:clarinet",
+            "label": "clarinet"
+          },
+          {
+            "curie": "lcma:double_bass",
+            "label": "double bass"
+          },
+          {
+            "curie": "lcma:flute",
+            "label": "flute"
+          },
+          {
+            "curie": "lcma:guitar",
+            "label": "guitar"
+          },
+          {
+            "curie": "lcma:harp",
+            "label": "harp"
+          },
+          {
+            "curie": "lcma:harpsichord",
+            "label": "harpsichord"
+          },
+          {
+            "curie": "lcma:horn",
+            "label": "horn"
+          },
+          {
+            "curie": "lcma:oboe",
+            "label": "oboe"
+          },
+          {
+            "curie": "lcma:organ",
+            "label": "organ"
+          },
+          {
+            "curie": "lcma:percussion",
+            "label": "percussion"
+          },
+          {
+            "curie": "lcma:piano",
+            "label": "piano"
+          },
+          {
+            "curie": "lcma:saxophone",
+            "label": "saxophone"
+          },
+          {
+            "curie": "lcma:timpani",
+            "label": "timpani"
+          },
+          {
+            "curie": "lcma:trombone",
+            "label": "trombone"
+          },
+          {
+            "curie": "lcma:trumpet",
+            "label": "trumpet"
+          },
+          {
+            "curie": "lcma:tuba",
+            "label": "tuba"
+          },
+          {
+            "curie": "lcma:viola",
+            "label": "viola"
+          },
+          {
+            "curie": "lcma:violin",
+            "label": "violin"
+          },
+          {
+            "curie": "lcma:voice",
+            "label": "voice"
+          }
+        ],
+        "multiValued": true,
+        "deltaValued": true
+      },
+      {
+        "name": "mode",
+        "aliases": [],
+        "control": "soft",
+        "suggested": [
+          "aeolian",
+          "dorian",
+          "lydian",
+          "major",
+          "minor",
+          "mixolydian",
+          "phrygian"
+        ]
+      },
+      {
+        "name": "motive",
+        "aliases": [
+          "motif"
+        ],
+        "control": "soft",
+        "suggested": [
+          "developed",
+          "fragmented",
+          "head-motive",
+          "inverted",
+          "liquidated"
+        ]
+      },
+      {
+        "name": "register",
+        "aliases": [
+          "reg"
+        ],
+        "control": "soft",
+        "suggested": [
+          "ascending",
+          "descending",
+          "high",
+          "low",
+          "middle",
+          "wide"
+        ]
+      },
+      {
+        "name": "rhythm",
+        "aliases": [
+          "rhy"
+        ],
+        "control": "soft",
+        "suggested": [
+          "dance-like",
+          "dotted",
+          "even",
+          "hemiola",
+          "syncopated",
+          "triplet"
+        ]
+      },
+      {
+        "name": "temporalFunction",
+        "aliases": [],
+        "control": "controlled",
+        "range": "TemporalFunction",
+        "values": [
+          {
+            "curie": "lcma:AfterEnd",
+            "label": "after-the-end"
+          },
+          {
+            "curie": "lcma:BeforeBeginning",
+            "label": "before-the-beginning"
+          },
+          {
+            "curie": "lcma:Beginning",
+            "label": "beginning"
+          },
+          {
+            "curie": "lcma:End",
+            "label": "end"
+          },
+          {
+            "curie": "lcma:Middle",
+            "label": "middle"
+          }
+        ]
+      },
+      {
+        "name": "texture",
+        "aliases": [
+          "tex"
+        ],
+        "control": "soft",
+        "suggested": [
+          "heterophonic",
+          "homophonic",
+          "homorhythmic",
+          "imitative",
+          "melody-and-accompaniment",
+          "monophonic",
+          "polyphonic"
+        ]
+      },
+      {
+        "name": "tightKnit",
+        "aliases": [],
+        "control": "controlled",
+        "range": "boolean",
+        "datatype": "boolean"
+      }
+    ],
+    "qualifiers": [
+      "contrasts_with",
+      "denser_than",
+      "faster_than",
+      "higher_than",
+      "longer_than",
+      "louder_than",
+      "lower_than",
+      "same_as",
+      "shorter_than",
+      "similar_to",
+      "slower_than",
+      "softer_than",
+      "sparser_than"
+    ]
+  },
+  "reference_sentinel": "previous"
+}
