@@ -19,4 +19,6 @@ def get_session_annotations(timeline_id: int) -> list[tuple[int, str]]:
     timeline = get(Get.TIMELINE, timeline_id)
     if timeline is None:
         return []
-    return [(unit.id, unit.get_data("annotation_data") or "") for unit in sorted(timeline)]
+    return [
+        (unit.id, unit.get_data("annotation_data") or "") for unit in sorted(timeline)
+    ]
