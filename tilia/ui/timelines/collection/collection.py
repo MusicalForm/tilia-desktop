@@ -3,7 +3,10 @@ from __future__ import annotations
 import functools
 import traceback
 from enum import Enum, auto
-from typing import Any, Callable, cast
+from typing import TYPE_CHECKING, Any, Callable, cast
+
+if TYPE_CHECKING:
+    from tilia.file.tilia_file import TiliaFile
 
 from PySide6.QtCore import QPoint, Qt
 from PySide6.QtWidgets import (
@@ -34,6 +37,12 @@ from tilia.ui.smooth_scroll import setup_smooth, smooth
 from tilia.ui.timelines.base.element_manager import ElementManager
 from tilia.ui.timelines.base.timeline import TimelineUI, with_elements
 from tilia.ui.timelines.collection.import_ import _on_import_to_timeline
+from tilia.ui.timelines.constants import (
+    MAX_PLAYBACK_WIDTH,
+    PIXELS_PER_SECOND,
+    PLAYBACK_AREA_WIDTH,
+    ZOOM_MULTIPLIER,
+)
 from tilia.ui.timelines.scene import TimelineScene
 from tilia.ui.timelines.toolbar import TimelineToolbar
 from tilia.ui.timelines.view import TimelineView
@@ -60,7 +69,6 @@ def command_callback(func, *args, **kwargs):
 
 
 class TimelineUIs:
-    ZOOM_FACTOR = 1.1
     UPDATE_TRIGGERS = ["height", "level_count", "visible_level_count"]
 
     def __init__(
@@ -87,6 +95,7 @@ class TimelineUIs:
         self._setup_selection_box()
         self._setup_drag_tracking_vars()
         self._setup_auto_scroll()
+        self._zoom_level: float = 1.0
         self.selected_time = 0.0
         self.loop_time = (self.selected_time, self.selected_time)
         self.loop_elements = set()
@@ -243,19 +252,16 @@ class TimelineUIs:
         # Commands for all timelines
         commands.register("timelines.clear_all", self.on_timelines_clear, "Clear all")
 
-        # Commands for timeline view
         commands.register(
-            "view.zoom.in",
-            functools.partial(self.on_zoom, "in"),
-            "Zoom &In",
-            "Ctrl++",
+            "view.zoom.in", self._on_zoom_in, "Zoom &In", "Ctrl++", icon="ZoomIn"
         )
-
         commands.register(
-            "view.zoom.out",
-            functools.partial(self.on_zoom, "out"),
-            "Zoom &Out",
-            "Ctrl+-",
+            "view.zoom.out", self._on_zoom_out, "Zoom &Out", "Ctrl+-", icon="ZoomOut"
+        )
+        commands.register(
+            "view.zoom.set",
+            self.on_zoom_set,
+            "Set Zoom Level",
         )
 
     def on_timeline_command(
@@ -489,10 +495,14 @@ class TimelineUIs:
                 functools.partial(self.on_import_to_timeline, ScoreTimeline),
             ),
             (Post.TIMELINE_UIS_VIEW_FOCUS_OUT, self.clear_selection_boxes),
+            (Post.PLAYER_DURATION_AVAILABLE, self._on_duration_available),
+            (Post.APP_FILE_LOADED, self._on_file_loaded),
         }
 
         SERVES = {
             (Get.TIMELINE_UI, self.get_timeline_ui),
+            (Get.CURRENT_ZOOM, lambda: self._zoom_level),
+            (Get.ZOOM_REFERENCE_WIDTH, self._get_zoom_reference),
             (Get.TIMELINE_UI_BY_ATTR, self.get_timeline_ui_by_attr),
             (Get.TIMELINE_UIS, self.get_timeline_uis),
             (Get.TIMELINE_UI_ELEMENT, self.get_timeline_ui_element),
@@ -517,6 +527,7 @@ class TimelineUIs:
         h = get(Get.TIMELINE, id).get_data("height")
         scene = self.create_timeline_scene(id, w, h)
         view = self.create_timeline_view(scene)
+        view.proxy = self.scene.addWidget(view)
 
         element_manager = ElementManager(timeline_class.ELEMENT_CLASS)
 
@@ -618,7 +629,6 @@ class TimelineUIs:
         post(Post.TIMELINE_UI_SELECTED, tl_ui)
 
     def add_timeline_view_to_scene(self, view: TimelineView, ordinal: int) -> None:
-        view.proxy = self.scene.addWidget(view)
         y = sum(tlui.get_data("height") for tlui in sorted(self)[: ordinal - 1])
         view.move(0, y)
         self.update_height()
@@ -632,6 +642,7 @@ class TimelineUIs:
 
     def update_height(self):
         self.update_timeline_uis_position()
+        self.scene.setSceneRect(0, 0, get(Get.TIMELINE_WIDTH), self.get_scene_height())
         self.set_playback_lines_position(get(Get.MEDIA_CURRENT_TIME))
         self.change_loop_box_position()
 
@@ -696,7 +707,7 @@ class TimelineUIs:
         )
 
     @staticmethod
-    def create_timeline_view(scene: TimelineScene):
+    def create_timeline_view(scene: TimelineScene) -> TimelineView:
         return TimelineView(scene)
 
     def setup_toolbar(self, tl_type: type[Timeline]):
@@ -1355,25 +1366,46 @@ class TimelineUIs:
                 get(Get.CLIPBOARD_CONTENTS),
             )
 
-    def on_zoom(self, direction: str, zoom_factor: float = ZOOM_FACTOR):
-        if direction not in ["in", "out"]:
-            return
+    def _get_zoom_reference(self) -> float:
+        duration = get(Get.MEDIA_DURATION)
+        return duration * PIXELS_PER_SECOND if duration > 0 else PLAYBACK_AREA_WIDTH
 
+    def _on_duration_available(self, duration: float) -> None:
+        if duration > 0:
+            self._apply_zoom(duration * PIXELS_PER_SECOND * get(Get.CURRENT_ZOOM))
+
+    def _on_zoom_in(self) -> None:
+        self.on_zoom_set(self._zoom_level * ZOOM_MULTIPLIER)
+
+    def _on_zoom_out(self) -> None:
+        self.on_zoom_set(self._zoom_level / ZOOM_MULTIPLIER)
+
+    def on_zoom_set(self, ratio: float) -> bool:
+        if not self._apply_zoom(self._get_zoom_reference() * ratio):
+            return False
+        self._zoom_level = ratio
+        post(Post.ZOOM_TOOLBAR_UPDATE, ratio)
+        return True
+
+    def _apply_zoom(self, new_width: float) -> bool:
+        if new_width < 1 or new_width > MAX_PLAYBACK_WIDTH:
+            return False
         prev_smooth_scroll = settings.get("general", "prioritise_performance")
         if not prev_smooth_scroll:
             settings.set("general", "prioritise_performance", True)
-
         self.view.setUpdatesEnabled(False)
-        post(
-            Post.PLAYBACK_AREA_SET_WIDTH,
-            get(Get.PLAYBACK_AREA_WIDTH)
-            * (zoom_factor if direction == "in" else 1 / zoom_factor),
-        )
+        post(Post.PLAYBACK_AREA_SET_WIDTH, new_width)
         self.center_on_time(self.selected_time)
         self.view.setUpdatesEnabled(True)
-
         if not prev_smooth_scroll:
             settings.set("general", "prioritise_performance", False)
+        return True
+
+    def _on_file_loaded(self, file: TiliaFile) -> None:
+        zoom = settings.get_file_zoom(file.file_path)
+        if zoom is not None:
+            self._zoom_level = zoom
+            post(Post.ZOOM_TOOLBAR_UPDATE, zoom)
 
     @command_callback
     def on_import_to_timeline(self, tl_type: type[Timeline]):

@@ -11,9 +11,7 @@ from PySide6.QtCore import (
     QKeyCombination,
     QObject,
     Qt,
-    QtMsgType,
     QUrl,
-    qInstallMessageHandler,
 )
 from PySide6.QtGui import QDesktopServices, QFontDatabase, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import (
@@ -22,7 +20,6 @@ from PySide6.QtWidgets import (
     QDockWidget,
     QGraphicsScene,
     QMainWindow,
-    QToolBar,
 )
 
 import tilia.constants
@@ -38,11 +35,11 @@ import tilia.ui.dialogs.file
 import tilia.ui.timelines.constants
 from tilia.file.media_metadata import MediaMetadata
 from tilia.file.tilia_file import TiliaFile
-from tilia.log import logger
 from tilia.requests import Get, Post, get, listen, post, serve
 from tilia.settings import settings
 from tilia.ui import commands
 from tilia.ui.timelines.collection.collection import TimelineUIs
+from tilia.ui.zoom_toolbar import ZoomToolbar
 from tilia.utils import get_tilia_class_string
 
 from ..media.player import QtAudioPlayer, QtVideoPlayer, YouTubePlayer
@@ -73,8 +70,6 @@ class TiliaMainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle(tilia.constants.APP_NAME)
         self.setWindowIcon(QIcon.fromTheme("tilia"))
-        self.setStatusTip("Main window")
-        qInstallMessageHandler(self.handle_qt_log_message)
         self.setAcceptDrops(True)
         self._drop_filter = FileDropEventFilter()
 
@@ -104,32 +99,6 @@ class TiliaMainWindow(QMainWindow):
         # leaving every custom icon blank (#475).
         scheme = QApplication.styleHints().colorScheme()
         return "tiliaDark" if scheme == Qt.ColorScheme.Dark else "tiliaLight"
-
-    # Qt warnings emitted on every paint while the SVG score viewer is open.
-    # They are harmless rendering-engine noise but flood the log loudly enough
-    # to make the app unresponsive (see issue #513).
-    QT_LOG_NOISE_PATTERNS = (
-        "QFont::setPixelSize: Pixel size <= 0",
-        "QWindowsFontEngineDirectWrite::addGlyphsToPath: GetGlyphRunOutline failed",
-    )
-
-    @staticmethod
-    def handle_qt_log_message(type, context, msg):
-        f_msg = f"[{type.name}] {context.file}:{context.line} - {msg}"
-        if type == QtMsgType.QtFatalMsg:
-            raise Exception(f_msg)
-        if type == QtMsgType.QtWarningMsg and any(
-            p in msg for p in TiliaMainWindow.QT_LOG_NOISE_PATTERNS
-        ):
-            return
-        # Qt's "Ambiguous shortcut overload" is logged at warning level and
-        # otherwise disappears silently — surface it to the user so we don't
-        # miss new collisions in production. Anything registered via
-        # commands.register goes through setup_shortcuts which preempts this
-        # warning; if we still see it, something is bypassing that system.
-        if "Ambiguous shortcut overload" in msg:
-            tilia.errors.display(tilia.errors.AMBIGUOUS_SHORTCUT, msg)
-        logger.error(f_msg)
 
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
         if event is None:
@@ -175,12 +144,13 @@ class TiliaMainWindow(QMainWindow):
         if not success:
             return
 
-        if result != widget.sceneRect().width():
+        original_zoom = get(Get.CURRENT_ZOOM)
+        needs_resize = result != widget.sceneRect().width()
+        if needs_resize:
             margins = 2 * get(Get.LEFT_MARGIN_X)
-            zoom_level = (result - margins) / (widget.sceneRect().width() - margins)
-            commands.execute("view.zoom.in", zoom_level)
-        else:
-            zoom_level = 1.0
+            commands.execute(
+                "view.zoom.set", (result - margins) / get(Get.ZOOM_REFERENCE_WIDTH)
+            )
 
         image = QPixmap(widget.sceneRect().size().toSize())
         painter = QPainter(image)
@@ -189,17 +159,12 @@ class TiliaMainWindow(QMainWindow):
         del painter
         del image
 
-        if zoom_level != 1.0:
-            commands.execute("view.zoom.out", zoom_level)
+        if needs_resize:
+            commands.execute("view.zoom.set", original_zoom)
 
 
 class FileDropEventFilter(QObject):
-    """Routes file drag/drop events from any widget to the main window.
-
-    Qt only delivers drag/drop events to widgets with setAcceptDrops(True),
-    and child widgets cover most of TiliaMainWindow, so an app-level filter
-    is needed to catch drops anywhere in the window.
-    """
+    """Handles file drag/drop events for the main window."""
 
     _DRAG_EVENT_TYPES = (
         QEvent.Type.DragEnter,
@@ -461,7 +426,7 @@ class QtUI:
         self._reset_window_title()
 
     def on_file_loaded(self, file: TiliaFile) -> None:
-        geometry, state = settings.get_geometry_and_state_from_path(file.file_path)
+        geometry, state = settings.get_file_geometry(file.file_path)
         if geometry and state:
             self.main_window.restoreGeometry(geometry)
             self.main_window.restoreState(state)
@@ -469,13 +434,17 @@ class QtUI:
         self._set_window_title_from_metadata_title()
 
     def _setup_widgets(self):
-        self.timeline_toolbars = QToolBar()
         self.timeline_uis = TimelineUIs(self.main_window)
         self.player_toolbar = PlayerToolbar()
         self.options_toolbar = OptionsToolbar()
 
         self.main_window.addToolBar(self.player_toolbar)
         self.main_window.addToolBar(self.options_toolbar)
+
+        self._zoom_toolbar = ZoomToolbar()
+        self.main_window.addToolBar(
+            Qt.ToolBarArea.BottomToolBarArea, self._zoom_toolbar
+        )
 
     def on_window_open(self, kind: WindowKind):
         """Open a window of 'kind', if there is no window of that kind open.
@@ -572,6 +541,7 @@ class QtUI:
                 window.close()
         self.main_window.setFocus()
         self._reset_window_title()
+        commands.execute("view.zoom.set", 1.0)
 
     @staticmethod
     def on_open_website_help():

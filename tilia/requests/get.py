@@ -65,6 +65,8 @@ class Get(Enum):
     VERIFIED_PATH = auto()
     WINDOW_GEOMETRY = auto()
     WINDOW_STATE = auto()
+    CURRENT_ZOOM = auto()
+    ZOOM_REFERENCE_WIDTH = auto()
 
 
 _requests_to_callbacks: weakref.WeakKeyDictionary[

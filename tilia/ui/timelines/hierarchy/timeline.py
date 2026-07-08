@@ -366,7 +366,13 @@ class HierarchyTimelineUI(TimelineUI):
 
     @with_elements
     def on_add_pre_start(self, elements: list[HierarchyUI]):
-        accept, value = get(Get.FROM_USER_FLOAT, "Add pre-start", "Pre-start length")
+        accept, value = get(
+            Get.FROM_USER_FLOAT,
+            "Add pre-start",
+            "Pre-start length",
+            minValue=HierarchyUI.MIN_FRAME_LENGTH,
+            maxValue=min(elm.get_data("start") for elm in elements),
+        )
         if not accept:
             return False
 
@@ -375,7 +381,14 @@ class HierarchyTimelineUI(TimelineUI):
 
     @with_elements
     def on_add_post_end(self, elements: list[HierarchyUI]):
-        accept, value = get(Get.FROM_USER_FLOAT, "Add post-end", "Post-end length")
+        accept, value = get(
+            Get.FROM_USER_FLOAT,
+            "Add post-end",
+            "Post-end length",
+            minValue=HierarchyUI.MIN_FRAME_LENGTH,
+            maxValue=get(Get.MEDIA_DURATION)
+            - max(elm.get_data("end") for elm in elements),
+        )
         if not accept:
             return False
 

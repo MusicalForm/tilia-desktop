@@ -419,8 +419,7 @@ def parse_span_model(jsonld: str) -> SpanModel | None:
                     )
     elif standalone and name:
         primary = primary_full = prettify(name)
-    elif standalone:
-        primary = primary_full = "Description"
+    # An unnamed standalone unit keeps the default "—" headline (no "Description" label).
 
     flags = SpanFlags(
         operator=operator,

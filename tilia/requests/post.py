@@ -97,6 +97,7 @@ class Post(Enum):
     WINDOW_CLOSE_DONE = auto()
     WINDOW_UPDATE_REQUEST = auto()
     WINDOW_UPDATE_STATE = auto()
+    ZOOM_TOOLBAR_UPDATE = auto()
 
 
 _posts_to_listeners: weakref.WeakKeyDictionary[Post, Any] = weakref.WeakKeyDictionary(
