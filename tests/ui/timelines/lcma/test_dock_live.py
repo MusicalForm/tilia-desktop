@@ -125,3 +125,43 @@ def test_dock_boots_and_round_trips(lcma_tl, lcma_form, lcma_tlui):
     finally:
         dock.deleteLater()
         QApplication.instance().processEvents()
+
+
+def test_session_units_drive_autoname_increment(lcma_tl, lcma_form, lcma_tlui):
+    """End-to-end proof of the auto-name numbering fix: the OTHER units' names, pushed over the
+    channel (setSessionUnits) by load_annotation, reach the embed and make autoName number a
+    fresh unit v -> v2. This is the seam that was broken (the embed hardcoded an empty unit list),
+    so a real webview is exercised, not a mocked one.
+    """
+    from tilia.ui.timelines.lcma.builder_dock import LcmaBuilderDock
+
+    dock = LcmaBuilderDock()
+    try:
+        assert _wait_until(lambda: dock._bridge_ready), "bridge never became ready"
+
+        # Unit A: bind it, then commit a blank-named verse. No sibling names yet, so autoName gives
+        # the bare abbreviation -> @id anno:v.
+        dock.load_annotation(lcma_tl.id, lcma_form.id, "")
+        QTest.qWait(400)
+        _run_js(dock, _commit_function_js("verse"))
+        assert _wait_until(lambda: '"anno:v"' in (lcma_form.annotation_data or "")), (
+            "unit A was not auto-named the bare 'v': " f"{lcma_form.annotation_data!r}"
+        )
+
+        # Unit B: binding it pushes A's committed JSON-LD to the embed (load_annotation ->
+        # _push_session_units -> setSessionUnits), so the embed now knows the name 'v' is taken.
+        b = lcma_tl.create_lcma_form(2, 3, 1)[0]
+        dock.load_annotation(lcma_tl.id, b.id, "")
+        QTest.qWait(
+            600
+        )  # let setSessionUnits + the embed's React state settle before committing
+
+        # B is a verse too, blank-named -> autoName must number it around A's 'v' -> 'v2'.
+        _run_js(dock, _commit_function_js("verse"))
+        assert _wait_until(lambda: "v2" in (b.annotation_data or "")), (
+            "unit B was not auto-incremented to 'v2' (setSessionUnits did not reach autoName): "
+            f"{b.annotation_data!r}"
+        )
+    finally:
+        dock.deleteLater()
+        QApplication.instance().processEvents()
