@@ -248,7 +248,7 @@ class TestParse:
             }
         )
         m = sv.parse_span_model(data)
-        assert m.primary == "Description"
+        assert m.primary == "—"  # unnamed standalone unit: no "Description" label
         assert m.flags.standalone is True
         assert m.color == sv.span_fill_hex("x", standalone=True)  # forced grey, paler
         assert m.attrs == [("mykey", "v")]
