@@ -74,11 +74,28 @@ Rule of thumb: anything a user could trigger is a command; anything only the cod
 - **Use `ORDERING_ATTRS` / natural `__lt__`** when sorting timeline components. Each `TimelineComponent` subclass declares `ORDERING_ATTRS` (e.g. `Range = ("start", "row_id")`); `sorted(components)` already orders correctly. Adding `key=lambda c: c.start` is at best redundant and at worst hides the secondary tiebreaker.
 - **Don't `raise` for stale-UI references or internal-invariant violations** on paths reachable in production. Use `tilia.log.logger.error(...)` + early return. The default console threshold is `ERROR`; `WARNING` only surfaces under `dev.log_requests=True`, so `error` is the level that actually reaches users.
 
+## Branching & worktrees
+
+`dev` is the source-of-truth branch for all development. `main` is release-only and is updated from `dev` separately — never target `main` from a feature branch.
+
+For parallel feature work (including multiple concurrent Claude sessions), use a git worktree per feature, branched off the current `dev` tip:
+
+```bash
+cd ~/dev/tilia-lcma        # the canonical clone, kept on dev
+git worktree add ../wt-<feature> -b feat/<feature> dev
+```
+
+- Name the branch after the feature (`feat/lcma-autoname-increment`), not a random session ID — it's what makes parallel worktrees traceable.
+- `dev` moves fast; rebase the feature branch onto `dev` before merging/PRing if it's fallen behind, to avoid stale-base conflicts.
+- PRs target `dev`, not `main`.
+- When a worktree's work is merged, remove it (`git worktree remove ...`) and delete the branch if it has no unique commits left (`git log --oneline dev..<branch>` is empty).
+- The vendored LCMA assets (`tilia/ui/timelines/lcma/{builder,validator}/embed.html` + `SOURCE.txt`) are generated from `~/lcma-annotation-ui` via `scripts/sync_lcma_assets.py`. If two feature branches both re-vendored independently, merging them will conflict on these files — resolve by re-running the sync script against the merged/latest source commit rather than hand-merging the generated HTML.
+
 ## Commit hygiene
 
 Split unrelated changes into their own commits, even if they were touched while building a feature: codebase-wide refactors (`type(Foo)` → `type[Foo]`), deprecation removals, mechanical fixes (block-signal patterns), `Post.*` additions consumed elsewhere, and doc/test-pattern updates that emerged from the work belong on their own commits with explanatory messages. Reviewers want to evaluate each rationale separately.
 
-When you discover a pre-existing bug in code unrelated to the feature you're working on, prompt for opening a separate PR off `main`/`dev` rather than burying the fix in the feature branch.
+When you discover a pre-existing bug in code unrelated to the feature you're working on, prompt for opening a separate PR off `dev` rather than burying the fix in the feature branch.
 
 ## Testing conventions
 
