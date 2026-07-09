@@ -14,5 +14,9 @@ tilia/dev
 .vscode
 .idea
 
+# OS / tooling junk
+.DS_Store
+.token-savior-cache.json
+
 # uv can be useful to create worktrees
 uv.lock
