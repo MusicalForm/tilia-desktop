@@ -8,7 +8,7 @@
 - [x] Hierarchie-Vierecke sollen umrandet/konturiert werden
 - [ ] Splits sollen angegebene Einheiten links behalten
 - [x] Label „Deskription" entfernen
-- [ ] Ctrl+Oben und Ctrl+Unten funktionieren nicht in der LCMA-Timeline
+- [x] Ctrl+Oben und Ctrl+Unten funktionieren nicht in der LCMA-Timeline
 - [ ] Ctrl+Shift+% soll ein Kürzel für „letzte Einheit wiederholen" sein
 - [ ] +guitar in Instrumentation wird nicht angezeigt
 - [ ] Zeichen für Vorschläge sollen Warndreiecke sein
