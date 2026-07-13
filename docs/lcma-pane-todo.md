@@ -6,7 +6,7 @@
 4. [x] Validierungspane von Annotation-UI übertragen
 5. [x] Enter-Taste soll zu LCMA-Pane fokussieren, nicht zum Vanilla-Inspektor
 6. [x] Hierarchie-Vierecke sollen umrandet/konturiert werden
-7. [ ] Splits sollen angegebene Einheiten links behalten
+7. [x] Splits sollen angegebene Einheiten links behalten
 8. [x] Label „Deskription" entfernen
 9. [x] Ctrl+Oben und Ctrl+Unten funktionieren nicht in der LCMA-Timeline
 10. [ ] Ctrl+Shift+% soll ein Kürzel für „letzte Einheit wiederholen" sein

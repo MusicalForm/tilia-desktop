@@ -275,6 +275,12 @@ class HierarchyTLComponentManager(TimelineComponentManager):
             left_inherits = ["pre_start"]
             right_inherits = ["post_end"]
 
+            # LCMA units carry their material/attribute annotations in
+            # annotation_data; on split, keep them on the left unit only
+            # (todo #7) rather than dropping them or duplicating them.
+            if hasattr(unit_to_split, "annotation_data"):
+                left_inherits.append("annotation_data")
+
             for attr in both_inherit:
                 self.timeline.set_component_data(
                     left_unit.id, attr, getattr(unit_to_split, attr)
