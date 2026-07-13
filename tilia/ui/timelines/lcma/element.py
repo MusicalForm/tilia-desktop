@@ -100,7 +100,7 @@ class LcmaFormUI(HierarchyUI):
         model = self.span_model
         if model is None:
             return self.get_data("label")
-        return display_label(model, lod_for(width))
+        return display_label(model, lod_for(width, model.headline_units))
 
     def _display_html(self, width: float) -> str:
         """The rich multi-line HTML label for the current annotation at this body width, or ``""``
@@ -109,7 +109,7 @@ class LcmaFormUI(HierarchyUI):
         model = self.span_model
         if model is None:
             return ""
-        return span_html(model, lod_for(width))
+        return span_html(model, lod_for(width, model.headline_units))
 
     @property
     def ui_color(self):
@@ -168,7 +168,9 @@ class LcmaFormUI(HierarchyUI):
         if model is None:
             self.label.set_plain(self.get_data("label") or "", width)
         else:
-            self.label.set_html(span_html(model, lod_for(width)), width)
+            self.label.set_html(
+                span_html(model, lod_for(width, model.headline_units)), width
+            )
         self.label.set_position(start_x, height, level)
 
     def update_label(self, start_x=None, end_x=None, level=None, height=None):

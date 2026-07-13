@@ -71,6 +71,40 @@ class TestAnnotatedRender:
         el.update_label(0, 300)
         assert "Basic idea" in el.label.toPlainText()
 
+    def test_multi_operand_headline_sheds_lod_earlier(self, lcma_form_ui):
+        # A 3-operand transformation headline is ~3× as wide, so the element picks its LOD tier
+        # against width/units. At 130px a plain function still shows full names ('med'/'full'), but
+        # the transformation sheds to the abbreviated 'short' tier instead of overflowing the band.
+        el = lcma_form_ui
+        transformation = json.dumps(
+            {
+                "forms": [
+                    {
+                        "@type": "lcma:Form",
+                        "function": {
+                            "@type": "lcma:FunctionOperation",
+                            "operator": "fnop:transformation",
+                            "operands": [
+                                {"hasCategory": "fn:basic_idea"},
+                                {"hasCategory": "fn:cadence"},
+                                {"hasCategory": "fn:transition"},
+                            ],
+                        },
+                    }
+                ]
+            }
+        )
+        el.set_data("annotation_data", transformation)
+        assert el.span_model.headline_units == 3
+        # 130px -> 130/3 ≈ 43 -> 'short' (abbreviated); without the units divisor this would be
+        # 'med' and paint the full names.
+        assert "Basic idea" not in el._display_html(130)
+        # given enough width (500/3 ≈ 166 -> 'full') the full names return
+        assert "Basic idea" in el._display_html(500)
+        # a plain function at the same 130px keeps its full-name label (ladder unchanged)
+        el.set_data("annotation_data", _jsonld())
+        assert "Basic idea" in el._display_html(130)
+
     def test_tooltip_is_set_from_annotation(self, lcma_form_ui):
         el = lcma_form_ui
         el.set_data("annotation_data", _jsonld())
