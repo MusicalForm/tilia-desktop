@@ -75,6 +75,17 @@ class TestPrettifyAndLod:
         assert sv.lod_for(31) == "min"
         assert sv.lod_for(0) == "min"
 
+    def test_lod_units_shed_earlier_for_multi_operand_headlines(self):
+        # A K-operand fusion/transformation headline is ~K× as wide, so the tier is picked against
+        # width/units: it sheds to a coarser tier earlier than a plain function of the same px width.
+        assert sv.lod_for(140, 1) == "full"  # plain function: ladder unchanged
+        assert sv.lod_for(140, 2) == "med"  # 140/2 = 70  -> med
+        assert sv.lod_for(140, 3) == "short"  # 140/3 ≈ 46 -> short
+        assert sv.lod_for(280, 2) == "full"  # 280/2 = 140 -> full
+        assert sv.lod_for(96, 3) == "short"  # 96/3 = 32   -> short
+        assert sv.lod_for(95, 3) == "min"  # 95/3 ≈ 31   -> min
+        assert sv.lod_for(64) == "med"  # units defaults to 1 (bare call unchanged)
+
 
 # --- parsing -------------------------------------------------------------------
 
@@ -780,6 +791,53 @@ class TestFunctionOperatorTree:
         )
         assert m.primary_full == "—/Transition"
         assert m.flags.operator == "fusion"
+
+    def test_headline_units_counts_leaf_functions(self):
+        # headline_units drives the LOD width demand: 1 for a plain function, the summed leaves for
+        # an operator tree (through nesting and the notional modifier), 2 for a legacy transformation
+        def units(fn: dict) -> int:
+            return sv.parse_span_model(_fn_form(fn)).headline_units
+
+        assert units(_leaf("basic_idea")) == 1
+        assert units(_op("fusion", _leaf("basic_idea"), _leaf("contrasting_idea"))) == 2
+        assert (
+            units(
+                _op(
+                    "transformation",
+                    _leaf("basic_idea"),
+                    _leaf("cadence"),
+                    _leaf("transition"),
+                )
+            )
+            == 3
+        )
+        # nested: transformation( notional(ant), fusion(bi, ci) ) -> 1 + 2 = 3
+        assert (
+            units(
+                _op(
+                    "transformation",
+                    _notional(_leaf("antecedent")),
+                    _op("fusion", _leaf("basic_idea"), _leaf("contrasting_idea")),
+                )
+            )
+            == 3
+        )
+        assert units(_notional(_leaf("antecedent"))) == 1  # modifier wrapping one leaf
+        # legacy binary transformation node
+        legacy = {
+            "@type": "lcma:FunctionTransformation",
+            "source": {"hasCategory": "fn:basic_idea"},
+            "target": {"hasCategory": "fn:transition"},
+        }
+        assert units(legacy) == 2
+
+    def test_headline_units_is_one_for_plain_and_placeholder(self):
+        # a plain function and a placeholder both stay on the tuned single-unit LOD ladder
+        assert sv.parse_span_model(_fn_form(_leaf("basic_idea"))).headline_units == 1
+        ph = json.dumps(
+            {"forms": [{"@type": "lcma:Placeholder", "hasCategory": "ph:repeat"}]}
+        )
+        assert sv.parse_span_model(ph).headline_units == 1
 
 
 # --- material references parsed to a string (material_text) --------------------

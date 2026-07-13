@@ -213,6 +213,11 @@ class SpanModel:
     flags: SpanFlags = field(default_factory=SpanFlags)
     refs: list[SpanRef] = field(default_factory=list)
     attrs: list[tuple[str, str]] = field(default_factory=list)
+    # Number of leaf functions in the headline: 1 for a plain function, N for an N-operand fusion /
+    # transformation. A K-operand headline is ~K× as wide, so the LOD tier is chosen against
+    # ``px_width / headline_units`` — the multi-operand names shed to a coarser tier earlier instead
+    # of overflowing the band. See ``lod_for``.
+    headline_units: int = 1
 
 
 @dataclass
@@ -347,6 +352,24 @@ def _fn_operator(fn: dict) -> str | None:
     return None
 
 
+def _fn_leaf_count(fn) -> int:
+    """The number of leaf functions in a function node: 1 for a bare leaf, the summed operands of a
+    ``lcma:FunctionOperation`` (fusion / transformation), the wrapped count through a notional
+    ``lcma:FunctionModifier``, and both sides of a legacy ``lcma:FunctionTransformation``. This is
+    the headline's width demand — a K-leaf headline is ~K× as wide — feeding the LOD tier (lod_for).
+    """
+    if not isinstance(fn, dict):
+        return 1
+    fn_type = fn.get("@type")
+    if fn_type == "lcma:FunctionOperation":
+        return sum(_fn_leaf_count(o) for o in (fn.get("operands") or [])) or 1
+    if fn_type == "lcma:FunctionModifier":
+        return _fn_leaf_count(fn.get("operand"))
+    if fn_type == "lcma:FunctionTransformation":
+        return _fn_leaf_count(fn.get("source")) + _fn_leaf_count(fn.get("target"))
+    return 1
+
+
 def _fn_provisional(fn) -> bool:
     """True when a PROVISIONAL (proposed, not-in-vocab) leaf sits anywhere in the function tree — a
     bare provisional leaf, or one inside a ``lcma:FunctionOperation``'s operands (fusion /
@@ -455,6 +478,7 @@ def parse_span_model(jsonld: str) -> SpanModel | None:
     material_text = ""
     operator = None
     notional = material = uncertain = provisional = False
+    headline_units = 1  # headline leaf count; >1 only for fusion / transformation
 
     if isinstance(form, dict):
         if form.get("@type") == "lcma:Placeholder":
@@ -468,6 +492,7 @@ def parse_span_model(jsonld: str) -> SpanModel | None:
             primary = _fn_headline(fn, True)
             primary_full = _fn_headline(fn, False)
             operator = _fn_operator(fn)
+            headline_units = _fn_leaf_count(fn)
             # A leaf carries `notional` as a bool; the operator tree carries it as a whole-subtree
             # `lcma:FunctionModifier` wrapper (e.g. a notional transformation). Either sets the flag
             # so the notional border + tooltip fire; the headline quotes it independently.
@@ -526,6 +551,7 @@ def parse_span_model(jsonld: str) -> SpanModel | None:
         flags=flags,
         refs=refs,
         attrs=attrs,
+        headline_units=headline_units,
     )
 
 
@@ -534,19 +560,26 @@ def parse_span_model(jsonld: str) -> SpanModel | None:
 Lod = str  # "full" | "med" | "short" | "min"
 
 
-def lod_for(px_width: float) -> Lod:
+def lod_for(px_width: float, headline_units: int = 1) -> Lod:
     """The detail tier a span at this pixel width can legibly show. As a span narrows, channels
     are shed in priority order rather than crammed and clipped.
 
     These thresholds are tuned for the multi-line, wrapping HTML label (span_html) in tall LCMA
     bands — NOT a single clipped line — so they are far lower than a one-line label would need:
     a ~70px unit wraps its full names over a few lines comfortably, where a single line would
-    have to abbreviate. Shedding still happens, just much later."""
-    if px_width >= 140:
+    have to abbreviate. Shedding still happens, just much later.
+
+    ``headline_units`` is the leaf count of the function headline (>1 only for a fusion /
+    transformation). A K-operand headline is ~K× as wide, so it needs ~K× the pixels to render the
+    same tier legibly; the tier is chosen against ``px_width / headline_units`` so a multi-operand
+    headline sheds to a coarser tier earlier instead of overflowing the band. A plain function
+    (``headline_units == 1``) leaves the ladder exactly as tuned."""
+    effective = px_width / headline_units if headline_units > 1 else px_width
+    if effective >= 140:
         return "full"
-    if px_width >= 64:
+    if effective >= 64:
         return "med"
-    if px_width >= 32:
+    if effective >= 32:
         return "short"
     return "min"
 
