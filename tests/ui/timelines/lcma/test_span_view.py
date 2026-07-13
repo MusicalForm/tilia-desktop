@@ -75,6 +75,17 @@ class TestPrettifyAndLod:
         assert sv.lod_for(31) == "min"
         assert sv.lod_for(0) == "min"
 
+    def test_lod_units_shed_earlier_for_multi_operand_headlines(self):
+        # A K-operand fusion/transformation headline is ~K× as wide, so the tier is picked against
+        # width/units: it sheds to a coarser tier earlier than a plain function of the same px width.
+        assert sv.lod_for(140, 1) == "full"  # plain function: ladder unchanged
+        assert sv.lod_for(140, 2) == "med"  # 140/2 = 70  -> med
+        assert sv.lod_for(140, 3) == "short"  # 140/3 ≈ 46 -> short
+        assert sv.lod_for(280, 2) == "full"  # 280/2 = 140 -> full
+        assert sv.lod_for(96, 3) == "short"  # 96/3 = 32   -> short
+        assert sv.lod_for(95, 3) == "min"  # 95/3 ≈ 31   -> min
+        assert sv.lod_for(64) == "med"  # units defaults to 1 (bare call unchanged)
+
 
 # --- parsing -------------------------------------------------------------------
 
@@ -294,6 +305,27 @@ class TestParse:
         m = sv.parse_span_model(data)
         assert m.primary == sv.PLACEHOLDER_ABBR["repeat"]  # "%"
         assert m.primary_full == "Repeat"
+
+    def test_bare_material_reference_shows_repeat_glyph_and_ref(self):
+        # A "ref!" unit: a function form with no category at all, only a material
+        # reference — must not fall back to the empty-headline em dash (todo #19).
+        data = json.dumps(
+            {
+                "forms": [
+                    {
+                        "@type": "lcma:Form",
+                        "function": {"@type": "lcma:Function"},
+                        "material": {
+                            "@type": "lcma:MaterialReferences",
+                            "refs": [{"ref": "Verse"}],
+                        },
+                    }
+                ],
+            }
+        )
+        m = sv.parse_span_model(data)
+        assert m.primary == f'{sv.PLACEHOLDER_ABBR["repeat"]} [Verse]'
+        assert m.primary_full == m.primary
 
     def test_standalone_is_grey_and_flagged(self):
         data = json.dumps(
@@ -639,6 +671,194 @@ class TestNewModelChannels:
         )
         m = sv.parse_span_model(data)
         assert m.attrs == [("harmonicProgression", "my-progression")]
+
+
+# --- function-operator tree: fusion (/) and transformation (→) -----------------
+# The builder serialises functions as a {operator, operands} tree — fusion and transformation, both
+# n-ary — with a notional modifier wrapper (jsonld.ts fnExprNode; docs/function-operators.md). The
+# span view must read both operators so the timeline shows what the reference editor's LabelChips do.
+
+
+def _fn_form(function: dict) -> str:
+    return json.dumps({"forms": [{"@type": "lcma:Form", "function": function}]})
+
+
+def _op(operator: str, *operands: dict) -> dict:
+    return {
+        "@type": "lcma:FunctionOperation",
+        "operator": f"fnop:{operator}",
+        "operands": list(operands),
+    }
+
+
+def _leaf(name: str) -> dict:
+    return {"@type": "lcma:Function", "hasCategory": f"fn:{name}"}
+
+
+def _notional(operand: dict) -> dict:
+    return {
+        "@type": "lcma:FunctionModifier",
+        "modifier": "fnop:notional",
+        "operand": operand,
+    }
+
+
+class TestFunctionOperatorTree:
+    def test_fusion_headline_operator_and_badge(self):
+        m = sv.parse_span_model(
+            _fn_form(_op("fusion", _leaf("basic_idea"), _leaf("contrasting_idea")))
+        )
+        bi, ci = sv.FUNCTION_ABBR["basic_idea"], sv.FUNCTION_ABBR["contrasting_idea"]
+        assert m.primary == f"{bi}/{ci}"  # abbreviated, joined by /
+        assert m.primary_full == "Basic idea/Contrasting idea"
+        assert m.flags.operator == "fusion"
+        assert [b.glyph for b in sv.badges_for(m)] == ["/"]
+
+    def test_transformation_operation_is_n_ary(self):
+        # the operator tree the bar authors now (a > b > c), distinct from the legacy binary
+        # lcma:FunctionTransformation node
+        m = sv.parse_span_model(
+            _fn_form(
+                _op(
+                    "transformation",
+                    _leaf("basic_idea"),
+                    _leaf("cadence"),
+                    _leaf("transition"),
+                )
+            )
+        )
+        assert m.primary_full == "Basic idea→Cadence→Transition"
+        assert m.primary_full.count("→") == 2
+        assert m.flags.operator == "transformation"
+        assert [b.glyph for b in sv.badges_for(m)] == ["→"]
+
+    def test_notional_modifier_quotes_whole_operation(self):
+        # "a > b" — the transformation itself is notional (a modifier wrapping the operation), which
+        # the old leaf-level bool could not express
+        m = sv.parse_span_model(
+            _fn_form(
+                _notional(
+                    _op("transformation", _leaf("antecedent"), _leaf("consequent"))
+                )
+            )
+        )
+        assert m.primary_full == "“Antecedent→Consequent”"
+        assert m.flags.notional is True
+        assert m.flags.operator == "transformation"  # unwrapped from the modifier
+
+    def test_nested_operation_is_parenthesised(self):
+        # "ant" > (bi / ci): a notional endpoint transformed into a fusion — the docs' nesting example
+        m = sv.parse_span_model(
+            _fn_form(
+                _op(
+                    "transformation",
+                    _notional(_leaf("antecedent")),
+                    _op("fusion", _leaf("basic_idea"), _leaf("contrasting_idea")),
+                )
+            )
+        )
+        assert m.primary_full == "“Antecedent”→(Basic idea/Contrasting idea)"
+        assert (
+            m.flags.operator == "transformation"
+        )  # outermost operator drives the badge
+
+    def test_provisional_leaf_inside_fusion_is_flagged(self):
+        m = sv.parse_span_model(
+            _fn_form(
+                _op(
+                    "fusion",
+                    {"provisional": True, "provisionalTerm": "weird"},
+                    _leaf("transition"),
+                )
+            )
+        )
+        assert m.primary_full == "Weird/Transition"
+        assert m.flags.provisional is True
+        assert "⚠" in [b.glyph for b in sv.badges_for(m)]
+
+    def test_leaf_crossing_rightward_is_an_inline_fusion(self):
+        # the old under-specified fusion: a bare leaf flagged crossing_rightward, rendered with a
+        # trailing / (mirrors SingleFnText's fn-op-pill)
+        m = sv.parse_span_model(
+            _fn_form(
+                {
+                    "@type": "lcma:Function",
+                    "hasCategory": "fn:basic_idea",
+                    "crossing_rightward": True,
+                }
+            )
+        )
+        assert m.primary_full == "Basic idea/"
+        assert m.flags.operator == "fusion"
+        assert [b.glyph for b in sv.badges_for(m)] == ["/"]
+
+    def test_fusion_named_in_tooltip(self):
+        m = sv.parse_span_model(
+            _fn_form(_op("fusion", _leaf("basic_idea"), _leaf("contrasting_idea")))
+        )
+        assert "• fusion" in sv.span_tooltip(m)
+
+    def test_operator_tree_with_no_or_bad_operands_never_crashes(self):
+        # hand-edited / malformed JSON-LD must degrade, not raise (see TestRobustness)
+        assert sv.parse_span_model(_fn_form(_op("transformation"))).primary_full == "—"
+        m = sv.parse_span_model(
+            _fn_form(
+                {
+                    "@type": "lcma:FunctionOperation",
+                    "operator": "fnop:fusion",
+                    "operands": ["junk", _leaf("transition")],
+                }
+            )
+        )
+        assert m.primary_full == "—/Transition"
+        assert m.flags.operator == "fusion"
+
+    def test_headline_units_counts_leaf_functions(self):
+        # headline_units drives the LOD width demand: 1 for a plain function, the summed leaves for
+        # an operator tree (through nesting and the notional modifier), 2 for a legacy transformation
+        def units(fn: dict) -> int:
+            return sv.parse_span_model(_fn_form(fn)).headline_units
+
+        assert units(_leaf("basic_idea")) == 1
+        assert units(_op("fusion", _leaf("basic_idea"), _leaf("contrasting_idea"))) == 2
+        assert (
+            units(
+                _op(
+                    "transformation",
+                    _leaf("basic_idea"),
+                    _leaf("cadence"),
+                    _leaf("transition"),
+                )
+            )
+            == 3
+        )
+        # nested: transformation( notional(ant), fusion(bi, ci) ) -> 1 + 2 = 3
+        assert (
+            units(
+                _op(
+                    "transformation",
+                    _notional(_leaf("antecedent")),
+                    _op("fusion", _leaf("basic_idea"), _leaf("contrasting_idea")),
+                )
+            )
+            == 3
+        )
+        assert units(_notional(_leaf("antecedent"))) == 1  # modifier wrapping one leaf
+        # legacy binary transformation node
+        legacy = {
+            "@type": "lcma:FunctionTransformation",
+            "source": {"hasCategory": "fn:basic_idea"},
+            "target": {"hasCategory": "fn:transition"},
+        }
+        assert units(legacy) == 2
+
+    def test_headline_units_is_one_for_plain_and_placeholder(self):
+        # a plain function and a placeholder both stay on the tuned single-unit LOD ladder
+        assert sv.parse_span_model(_fn_form(_leaf("basic_idea"))).headline_units == 1
+        ph = json.dumps(
+            {"forms": [{"@type": "lcma:Placeholder", "hasCategory": "ph:repeat"}]}
+        )
+        assert sv.parse_span_model(ph).headline_units == 1
 
 
 # --- material references parsed to a string (material_text) --------------------

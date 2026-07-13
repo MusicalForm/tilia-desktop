@@ -7,9 +7,10 @@ Headline abbreviations come from the ontology vocab (``FUNCTION_ABBR`` / ``MAIN_
 generated from ``ontology/lcma.ttl``); we vendor ``vocab.json`` next to this module so the
 timeline shows exactly what the reference editor does — see ``_load_abbr``. The painted fill
 matches the editor's rendered ``.span-fill`` (family hue composited over the white track) —
-see ``span_fill_hex``. One known gap: fusion / function-operator overlays are not yet
-serialised into JSON-LD, so only the cases that reach the wire are read (transformation via
-``lcma:FunctionTransformation``).
+see ``span_fill_hex``. Function operators reach the wire as a ``lcma:FunctionOperation`` tree —
+fusion (``/``) and transformation (``→``), both n-ary — with a ``lcma:FunctionModifier`` for a
+notional wrapper; these are read alongside the legacy ``lcma:FunctionTransformation``, so both
+fusions and transformations show on the span. See ``_fn_headline`` / ``_fn_operator``.
 
 Reads the compact JSON-LD the builder emits via ``toJsonLd``: the top-level ``name`` /
 ``forms`` / ``hasAttribute`` keys. The ``@context`` wrapper is present but ignored — the
@@ -212,6 +213,11 @@ class SpanModel:
     flags: SpanFlags = field(default_factory=SpanFlags)
     refs: list[SpanRef] = field(default_factory=list)
     attrs: list[tuple[str, str]] = field(default_factory=list)
+    # Number of leaf functions in the headline: 1 for a plain function, N for an N-operand fusion /
+    # transformation. A K-operand headline is ~K× as wide, so the LOD tier is chosen against
+    # ``px_width / headline_units`` — the multi-operand names shed to a coarser tier earlier instead
+    # of overflowing the band. See ``lod_for``.
+    headline_units: int = 1
 
 
 @dataclass
@@ -264,13 +270,37 @@ def _ordinal(n: int) -> str:
     return f"{n}{suffix}"
 
 
+# Function-operator glyphs, keyed on the operator's local name (the ``fnop:`` CURIE stripped) and
+# mirroring OverlayExpr in the web's LabelChips: a transformation joins its operands with a directed
+# arrow, a fusion with a slash. An unknown operator falls back to its bare name.
+_FN_OP_GLYPH = {"transformation": "→", "fusion": "/"}
+
+
 def _fn_headline(fn: dict, abbreviate: bool) -> str:
-    """A function node rendered to one line: a transformation as ``a→b``, else the function
-    category (abbreviated via the vocab, or prettified in full), quoted when notional, and
-    prefixed with its cardinality ordinal (``3rd intro``) when the leaf carries one. A PROVISIONAL
-    (proposed) leaf carries its verbatim term under ``provisionalTerm`` instead of a CURIE.
+    """A function node rendered to one line, mirroring OverlayExpr / SingleFnText in LabelChips.
+
+    The builder now authors a function-operator TREE: a ``lcma:FunctionOperation`` joins its
+    operands with the operator glyph (transformation ``→``, fusion ``/``; a nested operation is
+    parenthesised so the flat headline stays unambiguous), and a ``lcma:FunctionModifier`` wraps its
+    operand in ``“…”`` (notional). The legacy ``lcma:FunctionTransformation`` (``source→target``,
+    loaded from old data) and a bare leaf still render. On a leaf, its cardinality ordinal prefixes
+    the name (``3rd intro``), ``notional`` quotes it, and ``crossing_rightward`` — the old
+    under-specified fusion flag — appends a trailing ``/``. A PROVISIONAL (proposed) leaf carries
+    its verbatim term under ``provisionalTerm``, not a CURIE.
     """
-    if fn.get("@type") == "lcma:FunctionTransformation":
+    if not isinstance(fn, dict):
+        return "—"
+    fn_type = fn.get("@type")
+    if fn_type == "lcma:FunctionOperation":
+        op = _local(fn.get("operator", ""))
+        glyph = _FN_OP_GLYPH.get(op, op)
+        return (
+            glyph.join(_fn_operand(o, abbreviate) for o in (fn.get("operands") or []))
+            or "—"
+        )
+    if fn_type == "lcma:FunctionModifier":
+        return f"“{_fn_headline(fn.get('operand') or {}, abbreviate)}”"
+    if fn_type == "lcma:FunctionTransformation":
         return (
             f"{_fn_headline(fn.get('source') or {}, abbreviate)}→"
             f"{_fn_headline(fn.get('target') or {}, abbreviate)}"
@@ -286,23 +316,74 @@ def _fn_headline(fn: dict, abbreviate: bool) -> str:
     card = fn.get("cardinality")
     if card is not None:
         base = f"{_ordinal(card)} {base}"
-    return f"“{base}”" if fn.get("notional") else base
+    if fn.get("notional"):
+        base = f"“{base}”"
+    if fn.get("crossing_rightward"):
+        base = f"{base}/"
+    return base
+
+
+def _fn_operand(fn: dict, abbreviate: bool) -> str:
+    """An operand inside a ``lcma:FunctionOperation``: a nested operation is parenthesised so a flat
+    headline stays unambiguous (mirrors OverlayOperand); anything else renders inline."""
+    if isinstance(fn, dict) and fn.get("@type") == "lcma:FunctionOperation":
+        return f"({_fn_headline(fn, abbreviate)})"
+    return _fn_headline(fn, abbreviate)
 
 
 def _fn_operator(fn: dict) -> str | None:
-    if fn.get("@type") == "lcma:FunctionTransformation" or "source" in fn:
+    """The span's structural operator for the badge channel — ``"transformation"`` or ``"fusion"``,
+    the OUTERMOST operator of the function tree — or ``None`` for a plain leaf. Reads the
+    ``lcma:FunctionOperation`` operator, unwraps a notional ``lcma:FunctionModifier`` to the
+    operation it wraps, the legacy ``lcma:FunctionTransformation``, and a leaf's
+    ``crossing_rightward`` (the old under-specified fusion)."""
+    if not isinstance(fn, dict):
+        return None
+    fn_type = fn.get("@type")
+    if fn_type == "lcma:FunctionOperation":
+        op = _local(fn.get("operator", ""))
+        return op if op in _FN_OP_GLYPH else None
+    if fn_type == "lcma:FunctionModifier":
+        return _fn_operator(fn.get("operand") or {})
+    if fn_type == "lcma:FunctionTransformation" or "source" in fn:
         return "transformation"
-    return None  # fusion is not yet serialised into JSON-LD
+    if fn.get("crossing_rightward"):
+        return "fusion"
+    return None
+
+
+def _fn_leaf_count(fn) -> int:
+    """The number of leaf functions in a function node: 1 for a bare leaf, the summed operands of a
+    ``lcma:FunctionOperation`` (fusion / transformation), the wrapped count through a notional
+    ``lcma:FunctionModifier``, and both sides of a legacy ``lcma:FunctionTransformation``. This is
+    the headline's width demand — a K-leaf headline is ~K× as wide — feeding the LOD tier (lod_for).
+    """
+    if not isinstance(fn, dict):
+        return 1
+    fn_type = fn.get("@type")
+    if fn_type == "lcma:FunctionOperation":
+        return sum(_fn_leaf_count(o) for o in (fn.get("operands") or [])) or 1
+    if fn_type == "lcma:FunctionModifier":
+        return _fn_leaf_count(fn.get("operand"))
+    if fn_type == "lcma:FunctionTransformation":
+        return _fn_leaf_count(fn.get("source")) + _fn_leaf_count(fn.get("target"))
+    return 1
 
 
 def _fn_provisional(fn) -> bool:
-    """True when a function node carries a PROVISIONAL (proposed, not-in-vocab) leaf — a bare
-    provisional leaf or one inside a transformation's source/target. Mirrors fnProvisional in
-    spanView.ts, restricted to what reaches the wire (operator trees are not serialised)."""
+    """True when a PROVISIONAL (proposed, not-in-vocab) leaf sits anywhere in the function tree — a
+    bare provisional leaf, or one inside a ``lcma:FunctionOperation``'s operands (fusion /
+    transformation), a notional ``lcma:FunctionModifier``'s operand, or a legacy transformation's
+    source/target. Mirrors fnProvisional in the web, extended to the operator tree the builder now
+    serialises."""
     if not isinstance(fn, dict):
         return False
     if fn.get("provisional") is True:
         return True
+    if fn.get("@type") == "lcma:FunctionOperation":
+        return any(_fn_provisional(o) for o in (fn.get("operands") or []))
+    if fn.get("@type") == "lcma:FunctionModifier":
+        return _fn_provisional(fn.get("operand"))
     return _fn_provisional(fn.get("source")) or _fn_provisional(fn.get("target"))
 
 
@@ -397,6 +478,7 @@ def parse_span_model(jsonld: str) -> SpanModel | None:
     material_text = ""
     operator = None
     notional = material = uncertain = provisional = False
+    headline_units = 1  # headline leaf count; >1 only for fusion / transformation
 
     if isinstance(form, dict):
         if form.get("@type") == "lcma:Placeholder":
@@ -410,9 +492,23 @@ def parse_span_model(jsonld: str) -> SpanModel | None:
             primary = _fn_headline(fn, True)
             primary_full = _fn_headline(fn, False)
             operator = _fn_operator(fn)
-            notional = bool(fn.get("notional"))
+            headline_units = _fn_leaf_count(fn)
+            # A leaf carries `notional` as a bool; the operator tree carries it as a whole-subtree
+            # `lcma:FunctionModifier` wrapper (e.g. a notional transformation). Either sets the flag
+            # so the notional border + tooltip fire; the headline quotes it independently.
+            notional = bool(fn.get("notional")) or (
+                fn.get("@type") == "lcma:FunctionModifier"
+                and _local(fn.get("modifier", "")) == "notional"
+            )
             material = "material" in form
             material_text = _material_text(form.get("material"))
+            # A bare material reference (no function category at all — the builder's "ref!"
+            # shorthand) would otherwise fall back to the empty-headline em dash and hide the
+            # ref entirely at low LOD. Surface it as the "repeat" placeholder glyph + the ref,
+            # e.g. "% [ref]", mirroring how a real repeat placeholder renders its headline.
+            if not fn.get("hasCategory") and not fn.get("provisionalTerm") and material_text:
+                repeat_abbr = _abbr(PLACEHOLDER_ABBR, "repeat")
+                primary = primary_full = f"{repeat_abbr} [{material_text}]"
             uncertain = form.get("certainty") == "uncertain"
             ftype = form.get("formalType")
             # A proposed (commit-as-is) function leaf or formal type — flag it so the timeline
@@ -462,6 +558,7 @@ def parse_span_model(jsonld: str) -> SpanModel | None:
         flags=flags,
         refs=refs,
         attrs=attrs,
+        headline_units=headline_units,
     )
 
 
@@ -470,29 +567,39 @@ def parse_span_model(jsonld: str) -> SpanModel | None:
 Lod = str  # "full" | "med" | "short" | "min"
 
 
-def lod_for(px_width: float) -> Lod:
+def lod_for(px_width: float, headline_units: int = 1) -> Lod:
     """The detail tier a span at this pixel width can legibly show. As a span narrows, channels
     are shed in priority order rather than crammed and clipped.
 
     These thresholds are tuned for the multi-line, wrapping HTML label (span_html) in tall LCMA
     bands — NOT a single clipped line — so they are far lower than a one-line label would need:
     a ~70px unit wraps its full names over a few lines comfortably, where a single line would
-    have to abbreviate. Shedding still happens, just much later."""
-    if px_width >= 140:
+    have to abbreviate. Shedding still happens, just much later.
+
+    ``headline_units`` is the leaf count of the function headline (>1 only for a fusion /
+    transformation). A K-operand headline is ~K× as wide, so it needs ~K× the pixels to render the
+    same tier legibly; the tier is chosen against ``px_width / headline_units`` so a multi-operand
+    headline sheds to a coarser tier earlier instead of overflowing the band. A plain function
+    (``headline_units == 1``) leaves the ladder exactly as tuned."""
+    effective = px_width / headline_units if headline_units > 1 else px_width
+    if effective >= 140:
         return "full"
-    if px_width >= 64:
+    if effective >= 64:
         return "med"
-    if px_width >= 32:
+    if effective >= 32:
         return "short"
     return "min"
 
 
 def badges_for(m: SpanModel) -> list[Badge]:
-    """The single-glyph badges a span carries when inline text has no room. Notional (a
-    border style) and fusion (read from inline ``/``) are intentionally absent."""
+    """The single-glyph badges a span carries when inline text has no room. Notional (a border
+    style) is intentionally absent; the function operator shows its glyph — ``→`` transformation,
+    ``/`` fusion."""
     b: list[Badge] = []
     if m.flags.operator == "transformation":
         b.append(Badge("→", "transformation", "op"))  # →
+    elif m.flags.operator == "fusion":
+        b.append(Badge("/", "fusion", "op"))  # /
     if m.flags.material:
         b.append(Badge("▦", "material reference", "mat"))  # ▦
     if m.flags.attributes:

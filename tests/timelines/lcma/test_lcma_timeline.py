@@ -118,3 +118,14 @@ class TestInheritedHierarchyBehaviour:
         lcma_tl.split(5)
         assert len(lcma_tl) == 2
         assert all(isinstance(c, LcmaForm) for c in lcma_tl)
+
+    def test_split_keeps_annotation_data_on_left_unit(self, lcma_tl):
+        # todo #7: a unit's specified material/attribute annotations must
+        # stay with the left half of a split, not get dropped or duplicated.
+        form = lcma_tl.create_lcma_form(0, 10, 1)[0]
+        jsonld = '{"forms": [{"@type": "lcma:Form"}]}'
+        lcma_tl.set_component_data(form.id, "annotation_data", jsonld)
+        lcma_tl.split(5)
+        left_unit, right_unit = sorted(lcma_tl, key=lambda c: c.start)
+        assert left_unit.annotation_data == jsonld
+        assert right_unit.annotation_data == ""
