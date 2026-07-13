@@ -17,5 +17,5 @@
 15. [x] Kein Auto-Inkrement für automatische Namen
 16. [x] In TiLiA keine „Save"- und „Cancel"-Knöpfe; Änderungen direkt committen
 17. [x] Kardinalitäten sollen auch angezeigt werden
-18. [ ] Fusionen (/) und Tranformationen (>) sollen angezeigt werden
+18. [x] Fusionen (/) und Transformationen (>) sollen angezeigt werden
 19. [ ] Komponente mit nur Material-Referenz sollen nicht als "---" angezeigt werden. Ein reines Referenz `ref!`, z. B., soll als `% [ref]` angezeigt werden.
