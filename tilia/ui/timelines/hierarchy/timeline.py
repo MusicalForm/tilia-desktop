@@ -264,8 +264,13 @@ class HierarchyTimelineUI(TimelineUI):
                 "level", self.timeline.COMPONENT_KIND
             )
         )
-        return HierarchyUI.base_height() + (
-            HierarchyUI.x_increment_per_lvl() * max_level
+        # Measure with THIS timeline's element class, not HierarchyUI: an LCMA timeline draws
+        # far taller bands (LcmaFormUI overrides base_height / x_increment_per_lvl), so reading
+        # the base hierarchy constants here under-measured the needed height and the tallest
+        # band — e.g. one grown by grouping — clipped past the timeline's top edge.
+        element_class = self.ELEMENT_CLASS
+        return element_class.base_height() + (
+            element_class.x_increment_per_lvl() * max_level
         )
 
     @with_elements
