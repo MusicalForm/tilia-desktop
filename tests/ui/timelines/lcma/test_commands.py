@@ -7,6 +7,7 @@ right-click entries and shortcuts would silently dispatch to a hierarchy timelin
 
 import pytest
 
+from tilia.requests import Post, post
 from tilia.ui import commands
 from tilia.ui.menus import MenuItemKind
 from tilia.ui.timelines.lcma.context_menu import LcmaFormContextMenu
@@ -61,3 +62,26 @@ class TestLcmaCommands:
         # instantiation calls get_qaction per command -> raises if any is unregistered
         toolbar = LcmaTimelineToolbar()
         assert len(toolbar.actions()) == len(LcmaTimelineToolbar.COMMANDS)
+
+
+@pytest.mark.usefixtures("lcma_tlui")
+class TestLcmaCtrlArrowKeypress:
+    """Ctrl+Up / Ctrl+Down must change the level of the selected LCMA unit.
+
+    The inherited HierarchyTimelineUI.on_ctrl_vertical_arrow_press namespaces the
+    level command by the UI's own kind, so it fires ``timeline.lcma.*``. Before that
+    fix it hardcoded ``timeline.hierarchy.*`` and the keypress left the LCMA unit
+    untouched (dispatching to a hierarchy timeline, or nothing).
+    """
+
+    def test_ctrl_up_increases_level(self, lcma_tlui):
+        form = lcma_tlui.create_lcma_form(0, 1, 1)[0]
+        lcma_tlui.select_element(lcma_tlui.get_element(form.id))
+        post(Post.TIMELINE_KEY_PRESS_CTRL_UP)
+        assert lcma_tlui.get_element(form.id).get_data("level") == 2
+
+    def test_ctrl_down_decreases_level(self, lcma_tlui):
+        form = lcma_tlui.create_lcma_form(0, 1, 2)[0]
+        lcma_tlui.select_element(lcma_tlui.get_element(form.id))
+        post(Post.TIMELINE_KEY_PRESS_CTRL_DOWN)
+        assert lcma_tlui.get_element(form.id).get_data("level") == 1
