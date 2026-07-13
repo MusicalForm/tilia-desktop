@@ -295,6 +295,27 @@ class TestParse:
         assert m.primary == sv.PLACEHOLDER_ABBR["repeat"]  # "%"
         assert m.primary_full == "Repeat"
 
+    def test_bare_material_reference_shows_repeat_glyph_and_ref(self):
+        # A "ref!" unit: a function form with no category at all, only a material
+        # reference — must not fall back to the empty-headline em dash (todo #19).
+        data = json.dumps(
+            {
+                "forms": [
+                    {
+                        "@type": "lcma:Form",
+                        "function": {"@type": "lcma:Function"},
+                        "material": {
+                            "@type": "lcma:MaterialReferences",
+                            "refs": [{"ref": "Verse"}],
+                        },
+                    }
+                ],
+            }
+        )
+        m = sv.parse_span_model(data)
+        assert m.primary == f'{sv.PLACEHOLDER_ABBR["repeat"]} [Verse]'
+        assert m.primary_full == m.primary
+
     def test_standalone_is_grey_and_flagged(self):
         data = json.dumps(
             {
