@@ -424,7 +424,7 @@ class TestNewModelChannels:
         assert m.flags.provisional is True
         # proposed term shown verbatim (prettified), not "—"
         assert m.primary_full == "My new function"
-        assert "⊕" in [b.glyph for b in sv.badges_for(m)]
+        assert "⚠" in [b.glyph for b in sv.badges_for(m)]
         assert "• proposed term (not in the controlled vocabulary)" in sv.span_tooltip(
             m
         )
@@ -681,7 +681,7 @@ class TestSpanHtml:
                 }
             )
         )
-        assert "⊕" in sv.span_html(m, "full")
+        assert "⚠" in sv.span_html(m, "full")
 
     def test_values_are_html_escaped(self):
         m = sv.parse_span_model(

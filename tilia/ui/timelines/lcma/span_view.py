@@ -398,7 +398,7 @@ def parse_span_model(jsonld: str) -> SpanModel | None:
             uncertain = form.get("certainty") == "uncertain"
             ftype = form.get("formalType")
             # A proposed (commit-as-is) function leaf or formal type — flag it so the timeline
-            # marks it ⊕, the same channel the reference editor's LEGEND shows.
+            # marks it ⚠, the same channel the reference editor's LEGEND shows.
             provisional = _fn_provisional(fn) or _type_provisional(ftype)
             if isinstance(ftype, dict):
                 main = (
@@ -493,7 +493,7 @@ def badges_for(m: SpanModel) -> list[Badge]:
     if m.flags.uncertain:
         b.append(Badge("?", "uncertain", "unc"))
     if m.flags.provisional:
-        b.append(Badge("⊕", "proposed term — not in the controlled vocabulary", "prov"))
+        b.append(Badge("⚠", "proposed term — not in the controlled vocabulary", "prov"))
     return b
 
 
@@ -557,7 +557,7 @@ def span_tooltip(m: SpanModel) -> str:
 
 _HTML_TEXT = "#1a1a1a"  # near-black headline over the pale family fill
 _HTML_MUTED = "#5b6170"  # secondary channels (name, type, material, attributes)
-_HTML_PROV = "#b8860b"  # amber — a proposed (⊕) term, the editor's provisional accent
+_HTML_PROV = "#b8860b"  # amber — a proposed (⚠) term, the editor's provisional accent
 
 
 def _esc(value: str) -> str:
@@ -565,7 +565,7 @@ def _esc(value: str) -> str:
 
 
 def _headline_html(m: SpanModel, abbreviate: bool) -> str:
-    """The ``function | type`` headline as HTML: function bold (dark), type muted, with a ⊕
+    """The ``function | type`` headline as HTML: function bold (dark), type muted, with a ⚠
     (proposed) and ``?`` (uncertain) mark. ``abbreviate`` chooses the vocab abbreviation over the
     full prettified name (full names at full/med, abbreviations at short)."""
     fn = m.primary if abbreviate else m.primary_full
@@ -585,7 +585,7 @@ def _headline_html(m: SpanModel, abbreviate: bool) -> str:
             f'<span style="color:{_HTML_MUTED};font-style:italic"> · {_esc(m.secondary_sub)}</span>'
         )
     if m.flags.provisional:
-        parts.append(f'<span style="color:{_HTML_PROV}"> ⊕</span>')
+        parts.append(f'<span style="color:{_HTML_PROV}"> ⚠</span>')
     if m.flags.uncertain:
         parts.append(f'<span style="color:{_HTML_MUTED}"> ?</span>')
     return "".join(parts)
