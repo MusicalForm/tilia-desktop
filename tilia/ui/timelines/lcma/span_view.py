@@ -240,8 +240,13 @@ def _qualifier_term(q):
 def _value_term(v) -> str:
     # A controlled value is an {@id} node ref (shown as its local name; the web maps the CURIE to a
     # vocab label). A PROPOSED value is a flagged literal carrying its verbatim term. A soft/free
-    # value is a plain literal.
+    # value is a plain literal. A DELTA element (a deltaValued key like instrumentation +guitar) is an
+    # lcma:ValueChange node wrapping one of those — unwrap it and re-emit the +/− sign, mirroring the
+    # web's LabelChips add/remove marker (without which the value would render empty).
     if isinstance(v, dict):
+        if v.get("@type") == "lcma:ValueChange":
+            sign = "+" if _local(v.get("change", "")) == "added" else "−"
+            return sign + _value_term(v.get("value"))
         if v.get("provisional") is True:
             return v.get("provisionalTerm", "")
         return _local(v.get("@id", ""))

@@ -331,6 +331,80 @@ class TestParse:
         m = sv.parse_span_model(data)
         assert m.attrs == [("mood", "dark")]
 
+    def test_multi_valued_key_joins_its_values(self):
+        # a multi-valued key (instrumentation) is a SET — each element is joined with ", "
+        data = json.dumps(
+            {
+                "forms": [{"@type": "lcma:Form", "function": {"hasCategory": "fn:x"}}],
+                "hasAttribute": [
+                    {
+                        "@type": "lcma:AttributeAssignment",
+                        "key": {"@id": "lcma:instrumentation"},
+                        "value": [{"@id": "lcma:violin"}, {"@id": "lcma:guitar"}],
+                    }
+                ],
+            }
+        )
+        m = sv.parse_span_model(data)
+        assert m.attrs == [("instrumentation", "violin, guitar")]
+
+    def test_delta_valued_element_shows_add_remove_sign(self):
+        # a deltaValued element (instrumentation +guitar / -organ) reifies as an lcma:ValueChange
+        # node; it must render with its +/− sign, not fall through to an empty string
+        data = json.dumps(
+            {
+                "forms": [{"@type": "lcma:Form", "function": {"hasCategory": "fn:x"}}],
+                "hasAttribute": [
+                    {
+                        "@type": "lcma:AttributeAssignment",
+                        "key": {"@id": "lcma:instrumentation"},
+                        "value": [
+                            {"@id": "lcma:violin"},
+                            {
+                                "@type": "lcma:ValueChange",
+                                "change": "lcma:added",
+                                "value": {"@id": "lcma:guitar"},
+                            },
+                            {
+                                "@type": "lcma:ValueChange",
+                                "change": "lcma:removed",
+                                "value": {"@id": "lcma:organ"},
+                            },
+                        ],
+                    }
+                ],
+            }
+        )
+        m = sv.parse_span_model(data)
+        assert m.attrs == [("instrumentation", "violin, +guitar, −organ")]
+
+    def test_delta_valued_proposed_value_keeps_its_verbatim_term(self):
+        # a delta on a value NOT in the controlled enum (a proposed value) unwraps the flagged
+        # literal, still prefixed with the sign
+        data = json.dumps(
+            {
+                "forms": [{"@type": "lcma:Form", "function": {"hasCategory": "fn:x"}}],
+                "hasAttribute": [
+                    {
+                        "@type": "lcma:AttributeAssignment",
+                        "key": {"@id": "lcma:instrumentation"},
+                        "value": [
+                            {
+                                "@type": "lcma:ValueChange",
+                                "change": "lcma:added",
+                                "value": {
+                                    "provisional": True,
+                                    "provisionalTerm": "kazoo",
+                                },
+                            }
+                        ],
+                    }
+                ],
+            }
+        )
+        m = sv.parse_span_model(data)
+        assert m.attrs == [("instrumentation", "+kazoo")]
+
 
 # --- badges / display text / tooltip ------------------------------------------
 
