@@ -211,6 +211,67 @@ class TestParse:
         assert m.primary_full == "“Basic idea”"
         assert m.flags.notional is True
 
+    def test_cardinality_renders_as_ordinal_prefix(self):
+        # a function leaf's cardinality (repeat count) shows as an ordinal prefix on both tiers
+        data = json.dumps(
+            {
+                "forms": [
+                    {
+                        "@type": "lcma:Form",
+                        "function": {"hasCategory": "fn:intro", "cardinality": 3},
+                    }
+                ]
+            }
+        )
+        m = sv.parse_span_model(data)
+        assert m.primary == f"3rd {sv.FUNCTION_ABBR['intro']}"
+        assert m.primary_full == "3rd Intro"
+
+    def test_cardinality_ordinal_suffixes(self):
+        assert sv._ordinal(1) == "1st"
+        assert sv._ordinal(2) == "2nd"
+        assert sv._ordinal(3) == "3rd"
+        assert sv._ordinal(4) == "4th"
+        assert sv._ordinal(9) == "9th"
+
+    def test_cardinality_prefix_is_inside_notional_quotes(self):
+        # mirrors SingleFnText: `“${card}${name}”`, not `${card}“${name}”`
+        data = json.dumps(
+            {
+                "forms": [
+                    {
+                        "@type": "lcma:Form",
+                        "function": {
+                            "hasCategory": "fn:intro",
+                            "cardinality": 2,
+                            "notional": True,
+                        },
+                    }
+                ]
+            }
+        )
+        m = sv.parse_span_model(data)
+        assert m.primary_full == "“2nd Intro”"
+
+    def test_cardinality_on_transformation_side(self):
+        # each leaf of a transformation carries its own cardinality
+        data = json.dumps(
+            {
+                "forms": [
+                    {
+                        "@type": "lcma:Form",
+                        "function": {
+                            "@type": "lcma:FunctionTransformation",
+                            "source": {"hasCategory": "fn:intro", "cardinality": 2},
+                            "target": {"hasCategory": "fn:transition"},
+                        },
+                    }
+                ]
+            }
+        )
+        m = sv.parse_span_model(data)
+        assert m.primary_full == "2nd Intro→Transition"
+
     def test_placeholder(self):
         data = json.dumps(
             {

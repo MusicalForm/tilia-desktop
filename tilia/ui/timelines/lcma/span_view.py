@@ -252,9 +252,17 @@ def _unit_name(iri: str) -> str:
     return unquote(_local(iri))  # inverse of unitIri (encodeURIComponent)
 
 
+def _ordinal(n: int) -> str:
+    """``1`` -> ``1st``, ``2`` -> ``2nd`` … ``4`` -> ``4th``. Mirrors ordinal() in
+    annotation-ui format.ts — the cardinality (repeat-count) prefix on a function leaf."""
+    suffix = {1: "st", 2: "nd", 3: "rd"}.get(n, "th")
+    return f"{n}{suffix}"
+
+
 def _fn_headline(fn: dict, abbreviate: bool) -> str:
     """A function node rendered to one line: a transformation as ``a→b``, else the function
-    category (abbreviated via the vocab, or prettified in full), quoted when notional. A PROVISIONAL
+    category (abbreviated via the vocab, or prettified in full), quoted when notional, and
+    prefixed with its cardinality ordinal (``3rd intro``) when the leaf carries one. A PROVISIONAL
     (proposed) leaf carries its verbatim term under ``provisionalTerm`` instead of a CURIE.
     """
     if fn.get("@type") == "lcma:FunctionTransformation":
@@ -268,6 +276,11 @@ def _fn_headline(fn: dict, abbreviate: bool) -> str:
         else _local(fn.get("hasCategory", ""))
     )
     base = (_abbr(FUNCTION_ABBR, name) if abbreviate else prettify(name)) or "—"
+    # Cardinality (the repeat count) renders as an ordinal prefix, inside the notional quotes —
+    # mirrors SingleFnText in LabelChips.tsx (`${card}${name}`).
+    card = fn.get("cardinality")
+    if card is not None:
+        base = f"{_ordinal(card)} {base}"
     return f"“{base}”" if fn.get("notional") else base
 
 
