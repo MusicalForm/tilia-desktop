@@ -19,3 +19,4 @@
 17. [x] Kardinalitäten sollen auch angezeigt werden
 18. [x] Fusionen (/) und Transformationen (>) sollen angezeigt werden
 19. [ ] Komponente mit nur Material-Referenz sollen nicht als "---" angezeigt werden. Ein reines Referenz `ref!`, z. B., soll als `% [ref]` angezeigt werden.
+21. [x] Bug: Einheit mit vorgeschlagener Funktion → Klick auf Typ ließ die Funktion verschwinden
