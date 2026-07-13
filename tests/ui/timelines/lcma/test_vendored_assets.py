@@ -49,8 +49,10 @@ class TestVendoredValidator:
     def test_exposes_diagnose_session_and_inlines_engine(self):
         html = VALIDATOR_HTML.read_text(encoding="utf-8")
         assert "diagnoseSession" in html  # the Py -> JS entry the validation dock calls (validator.ts)
-        # a diagnostic message string only present if the engine (model/diagnostics.ts) inlined
+        # diagnostic message strings only present if the engine (model/diagnostics.ts) inlined; the
+        # second guards that a re-vendor kept the empty/name-only rules (a stale bundle would drop it)
         assert "Undefined reference" in html
+        assert "Empty unit" in html
 
 
 class TestVendoredVocab:

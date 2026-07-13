@@ -77,6 +77,13 @@
         ]
       },
       {
+        "name": "conclusion_srdc",
+        "abbr": "c",
+        "aliases": [
+          "conclusion"
+        ]
+      },
+      {
         "name": "consequent",
         "abbr": "cons",
         "aliases": [
@@ -97,6 +104,13 @@
         "abbr": "ci",
         "aliases": [
           "ci"
+        ]
+      },
+      {
+        "name": "departure_srdc",
+        "abbr": "d",
+        "aliases": [
+          "departure"
         ]
       },
       {
@@ -220,6 +234,13 @@
         ]
       },
       {
+        "name": "restatement_srdc",
+        "abbr": "r",
+        "aliases": [
+          "restatement"
+        ]
+      },
+      {
         "name": "retransition",
         "abbr": "rtr",
         "aliases": [
@@ -259,6 +280,13 @@
         "abbr": "so",
         "aliases": [
           "solo"
+        ]
+      },
+      {
+        "name": "statement_srdc",
+        "abbr": "s",
+        "aliases": [
+          "statement"
         ]
       },
       {
