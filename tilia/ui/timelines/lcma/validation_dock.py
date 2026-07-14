@@ -175,6 +175,7 @@ class LcmaValidationDock(ViewDockWidget):
             logger.error("LCMA validation: engine returned non-JSON: %r", result)
             return
         self._render(diagnostics)
+        self._update_element_markers(diagnostics)
 
     # --- render ---
 
@@ -217,6 +218,30 @@ class LcmaValidationDock(ViewDockWidget):
         if warnings:
             parts.append(f"{warnings} warning" + ("s" if warnings != 1 else ""))
         return "Validation: " + ", ".join(parts)
+
+    # --- per-unit error markers (todo #3) ---
+
+    def _update_element_markers(self, diagnostics: list[dict]) -> None:
+        """Flag each validated unit's element with whether the lint found an ERROR on it, so the
+        element paints (or clears) the ⊗ marker. Every unit in the last computed session is set
+        explicitly — True for the flagged ones, False for the rest — so a fixed error clears on the
+        next recompute. Diagnose-driven: the element never runs the lint itself. Warnings (incl. the
+        ⚠ proposed-term badge, which is the unit's OWN data) are intentionally not mirrored here —
+        only errors get the element marker."""
+        error_ids = set()
+        for d in diagnostics:
+            if d.get("severity") != "error":
+                continue
+            index = d.get("index", -1)
+            if 0 <= index < len(self._ordered_ids):
+                error_ids.add(self._ordered_ids[index])
+        for cmp_id in self._ordered_ids:
+            try:
+                element = get(Get.TIMELINE_UI_ELEMENT, self._tl_id, cmp_id)
+            except NoReplyToRequest:
+                continue
+            if element is not None:
+                element.set_validation_error(cmp_id in error_ids)
 
     # --- click -> select the flagged unit ---
 
