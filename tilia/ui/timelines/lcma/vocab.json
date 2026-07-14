@@ -2,200 +2,302 @@
   "functions": {
     "specific": [
       {
+        "name": "a_aaba",
+        "abbr": "a",
+        "aliases": [
+          "a_aaba",
+          "aaba-a"
+        ],
+        "subtypes": []
+      },
+      {
         "name": "after_the_end",
         "abbr": "ate",
         "aliases": [
           "ate"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "antecedent",
         "abbr": "ant",
         "aliases": [
           "ant"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "basic_idea",
         "abbr": "bi",
         "aliases": [
           "bi"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "before_the_beginning",
         "abbr": "btb",
         "aliases": [
           "btb"
-        ]
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "beginning",
+        "abbr": "beg",
+        "aliases": [
+          "beginning"
+        ],
+        "subtypes": []
       },
       {
         "name": "bridge",
         "abbr": "br",
         "aliases": [
           "bridge"
+        ],
+        "subtypes": [
+          "bridge_classic",
+          "bridge_modern"
         ]
       },
       {
-        "name": "cadential_subphrase",
+        "name": "cadential_idea",
         "abbr": "cad",
         "aliases": [
-          "cad"
-        ]
+          "cad",
+          "cadential subphrase"
+        ],
+        "subtypes": []
       },
       {
         "name": "chorus",
         "abbr": "ch",
         "aliases": [
           "chorus"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "closing_theme",
         "abbr": "cls",
         "aliases": [
           "cls"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "coda",
         "abbr": "coda",
-        "aliases": []
+        "aliases": [],
+        "subtypes": []
       },
       {
         "name": "codetta",
         "abbr": "cdta",
         "aliases": [
           "cdta"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "compound_basic_idea",
         "abbr": "cbi",
         "aliases": [
           "cbi"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "conclusion_srdc",
         "abbr": "c",
         "aliases": [
           "conclusion"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "consequent",
         "abbr": "cons",
         "aliases": [
           "cons"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "continuation_idea",
+        "abbr": "conti",
+        "aliases": [
+          "conti",
+          "continuation idea"
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "continuation_phrase",
         "abbr": "cont",
         "aliases": [
           "cont",
-          "conti",
-          "continuation"
-        ]
+          "continuation",
+          "continuation phrase"
+        ],
+        "subtypes": []
       },
       {
         "name": "contrasting_idea",
         "abbr": "ci",
         "aliases": [
           "ci"
-        ]
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "contrasting_middle",
+        "abbr": "cm",
+        "aliases": [
+          "cm",
+          "contrasting middle"
+        ],
+        "subtypes": []
       },
       {
         "name": "departure_srdc",
         "abbr": "d",
         "aliases": [
           "departure"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "development_section",
         "abbr": "dev",
         "aliases": [
           "dev"
-        ]
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "end",
+        "abbr": "end",
+        "aliases": [
+          "end"
+        ],
+        "subtypes": []
       },
       {
         "name": "exposition",
         "abbr": "exp",
         "aliases": [
           "exp"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "fragmentation",
         "abbr": "frag",
         "aliases": [
           "frag"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "interlude",
         "abbr": "il",
         "aliases": [
           "interlude"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "intro",
         "abbr": "in",
         "aliases": [
           "intro"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "introduction",
         "abbr": "intro",
         "aliases": [
           "intro"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "lead_in",
         "abbr": "lin",
         "aliases": [
           "lin"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "link",
         "abbr": "lk",
         "aliases": [
           "link"
-        ]
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "middle",
+        "abbr": "mid",
+        "aliases": [
+          "middle"
+        ],
+        "subtypes": []
       },
       {
         "name": "model",
         "abbr": "mod",
         "aliases": [
           "mod"
-        ]
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "model_sequence",
+        "abbr": "modseq",
+        "aliases": [
+          "model sequence",
+          "model-sequence",
+          "modseq"
+        ],
+        "subtypes": []
       },
       {
         "name": "movement",
         "abbr": "mvt",
         "aliases": [
           "mvt"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "outro",
         "abbr": "out",
         "aliases": [
           "outro"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "postcadential",
         "abbr": "pcad",
         "aliases": [
           "pcad"
-        ]
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "postchorus",
+        "abbr": "postch",
+        "aliases": [
+          "post-chorus",
+          "postchorus"
+        ],
+        "subtypes": []
       },
       {
         "name": "prechorus",
@@ -203,34 +305,50 @@
         "aliases": [
           "pre-chorus",
           "prechorus"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "presentation",
         "abbr": "pres",
         "aliases": [
           "pres"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "primary_theme",
         "abbr": "pt",
         "aliases": [
           "pt"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "primary_theme_zone",
         "abbr": "ptz",
         "aliases": [
           "ptz"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "recapitulation",
         "abbr": "recap",
         "aliases": [
           "recap"
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "refrain",
+        "abbr": "refr",
+        "aliases": [
+          "refrain"
+        ],
+        "subtypes": [
+          "refrain_head",
+          "refrain_tail"
         ]
       },
       {
@@ -238,77 +356,115 @@
         "abbr": "r",
         "aliases": [
           "restatement"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "retransition",
         "abbr": "rtr",
         "aliases": [
           "rtr"
-        ]
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "riff",
+        "abbr": "riff",
+        "aliases": [
+          "riff"
+        ],
+        "subtypes": []
       },
       {
         "name": "ritornello",
         "abbr": "rit",
         "aliases": [
           "rit"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "secondary_theme",
         "abbr": "st",
         "aliases": [
           "st"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "secondary_theme_zone",
         "abbr": "stz",
         "aliases": [
           "stz"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "sequence",
         "abbr": "seq",
         "aliases": [
           "seq"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "solo",
         "abbr": "so",
         "aliases": [
           "solo"
-        ]
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "standing_on_the_dominant",
+        "abbr": "sod",
+        "aliases": [
+          "SotD",
+          "dominant lock",
+          "sod",
+          "standing on the dominant"
+        ],
+        "subtypes": []
       },
       {
         "name": "statement_srdc",
         "abbr": "s",
         "aliases": [
           "statement"
-        ]
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "terminal_climax",
+        "abbr": "tc",
+        "aliases": [
+          "terminal climax"
+        ],
+        "subtypes": []
       },
       {
         "name": "thematic_introduction",
         "abbr": "ti",
         "aliases": [
           "ti"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "transition",
         "abbr": "tr",
         "aliases": [
           "tr"
-        ]
+        ],
+        "subtypes": []
       },
       {
         "name": "verse",
         "abbr": "v",
         "aliases": [
           "verse"
-        ]
+        ],
+        "subtypes": []
       }
     ],
     "cadences": [
@@ -368,6 +524,15 @@
         "aliases": [
           "PAC"
         ]
+      },
+      {
+        "name": "plagal_cadence",
+        "abbr": "PC",
+        "aliases": [
+          "PC",
+          "plagal"
+        ],
+        "status": "provisional"
       }
     ],
     "generic_units": [
@@ -429,6 +594,13 @@
         "aliases": []
       },
       {
+        "name": "track",
+        "abbr": "track",
+        "aliases": [
+          "track"
+        ]
+      },
+      {
         "name": "unit",
         "abbr": "x",
         "aliases": [
@@ -445,7 +617,54 @@
         "abbr": "zone",
         "aliases": []
       }
-    ]
+    ],
+    "subtypes": [
+      {
+        "name": "bridge_classic",
+        "abbr": "br.c",
+        "aliases": [
+          "bridge.classic",
+          "classic bridge",
+          "middle eight"
+        ]
+      },
+      {
+        "name": "bridge_modern",
+        "abbr": "br.m",
+        "aliases": [
+          "bridge.modern",
+          "modern bridge"
+        ]
+      },
+      {
+        "name": "refrain_head",
+        "abbr": "refr.h",
+        "aliases": [
+          "head refrain",
+          "refrain-head",
+          "refrain.head"
+        ]
+      },
+      {
+        "name": "refrain_tail",
+        "abbr": "refr.t",
+        "aliases": [
+          "refrain-tail",
+          "refrain.tail",
+          "tail refrain"
+        ]
+      }
+    ],
+    "subtypes_by_main": {
+      "refrain": [
+        "refrain_head",
+        "refrain_tail"
+      ],
+      "bridge": [
+        "bridge_classic",
+        "bridge_modern"
+      ]
+    }
   },
   "cardinalities": [
     1,
@@ -623,6 +842,25 @@
         "subtypes": []
       },
       {
+        "name": "strophic_form",
+        "abbr": "strophic_form",
+        "aliases": [
+          "AAA",
+          "strophic",
+          "strophic form"
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "terminally_climactic_form",
+        "abbr": "terminally_climactic",
+        "aliases": [
+          "tcf",
+          "terminally-climactic"
+        ],
+        "subtypes": []
+      },
+      {
         "name": "ternary",
         "abbr": "ternary",
         "aliases": [],
@@ -632,10 +870,29 @@
         ]
       },
       {
+        "name": "through_composed_form",
+        "abbr": "through_composed_form",
+        "aliases": [
+          "durchkomponiert",
+          "through-composed form"
+        ],
+        "subtypes": []
+      },
+      {
         "name": "unary_form",
         "abbr": "unary",
         "aliases": [
           "unary"
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "verse_chorus_form",
+        "abbr": "verse_chorus",
+        "aliases": [
+          "vcf",
+          "verse chorus",
+          "verse-chorus"
         ],
         "subtypes": []
       }
@@ -924,6 +1181,10 @@
           {
             "curie": "fn:pac",
             "label": "perfect authentic cadence"
+          },
+          {
+            "curie": "fn:plagal_cadence",
+            "label": "plagal cadence"
           }
         ]
       },
@@ -1069,6 +1330,14 @@
         "deltaValued": true
       },
       {
+        "name": "lyrics",
+        "aliases": [
+          "text",
+          "words"
+        ],
+        "control": "soft"
+      },
+      {
         "name": "mode",
         "aliases": [],
         "control": "soft",
@@ -1124,6 +1393,100 @@
           "hemiola",
           "syncopated",
           "triplet"
+        ]
+      },
+      {
+        "name": "soloist",
+        "aliases": [
+          "solo instrument"
+        ],
+        "control": "soft",
+        "range": "Instrument",
+        "values": [
+          {
+            "curie": "lcma:bassoon",
+            "label": "bassoon"
+          },
+          {
+            "curie": "lcma:cello",
+            "label": "cello"
+          },
+          {
+            "curie": "lcma:clarinet",
+            "label": "clarinet"
+          },
+          {
+            "curie": "lcma:double_bass",
+            "label": "double bass"
+          },
+          {
+            "curie": "lcma:flute",
+            "label": "flute"
+          },
+          {
+            "curie": "lcma:guitar",
+            "label": "guitar"
+          },
+          {
+            "curie": "lcma:harp",
+            "label": "harp"
+          },
+          {
+            "curie": "lcma:harpsichord",
+            "label": "harpsichord"
+          },
+          {
+            "curie": "lcma:horn",
+            "label": "horn"
+          },
+          {
+            "curie": "lcma:oboe",
+            "label": "oboe"
+          },
+          {
+            "curie": "lcma:organ",
+            "label": "organ"
+          },
+          {
+            "curie": "lcma:percussion",
+            "label": "percussion"
+          },
+          {
+            "curie": "lcma:piano",
+            "label": "piano"
+          },
+          {
+            "curie": "lcma:saxophone",
+            "label": "saxophone"
+          },
+          {
+            "curie": "lcma:timpani",
+            "label": "timpani"
+          },
+          {
+            "curie": "lcma:trombone",
+            "label": "trombone"
+          },
+          {
+            "curie": "lcma:trumpet",
+            "label": "trumpet"
+          },
+          {
+            "curie": "lcma:tuba",
+            "label": "tuba"
+          },
+          {
+            "curie": "lcma:viola",
+            "label": "viola"
+          },
+          {
+            "curie": "lcma:violin",
+            "label": "violin"
+          },
+          {
+            "curie": "lcma:voice",
+            "label": "voice"
+          }
         ]
       },
       {
@@ -1194,5 +1557,9 @@
       "sparser_than"
     ]
   },
-  "reference_sentinel": "previous"
+  "reference_sentinel": "previous",
+  "rejected": [
+    "basic idae",
+    "bel"
+  ]
 }
