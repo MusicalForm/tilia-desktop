@@ -502,15 +502,14 @@ def parse_span_model(jsonld: str) -> SpanModel | None:
             )
             material = "material" in form
             material_text = _material_text(form.get("material"))
-            # A bare material reference (no function category at all — the builder's "ref!"
-            # shorthand) would otherwise fall back to the empty-headline em dash and hide the
-            # ref entirely at low LOD. Surface it as the "repeat" placeholder glyph + the ref,
-            # e.g. "% [ref]", mirroring how a real repeat placeholder renders its headline.
-            if (
-                not fn.get("hasCategory")
-                and not fn.get("provisionalTerm")
-                and material_text
-            ):
+            # A bare material reference (no function at all — the builder's "ref!" shorthand)
+            # would otherwise fall back to the empty-headline em dash and hide the ref entirely
+            # at low LOD. Surface it as the "repeat" placeholder glyph + the ref, e.g. "% [ref]",
+            # mirroring how a real repeat placeholder renders its headline. Gate on the EMPTY
+            # headline itself: a function-operator TREE (fusion / transformation / notional) also
+            # lacks a top-level ``hasCategory``, but DOES render a headline (``bi/ci``, ``bi→ci``)
+            # and must keep it — testing ``hasCategory`` alone wrongly clobbered it to "% [ref]".
+            if primary == "—" and material_text:
                 repeat_abbr = _abbr(PLACEHOLDER_ABBR, "repeat")
                 primary = primary_full = f"{repeat_abbr} [{material_text}]"
             uncertain = form.get("certainty") == "uncertain"

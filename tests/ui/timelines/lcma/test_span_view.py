@@ -327,6 +327,72 @@ class TestParse:
         assert m.primary == f'{sv.PLACEHOLDER_ABBR["repeat"]} [Verse]'
         assert m.primary_full == m.primary
 
+    def test_fusion_with_material_keeps_its_headline(self):
+        # todo #4: a fusion / transformation form carrying a material reference must render its
+        # function headline (bi/ci), NOT collapse to the bare-reference "% [ref]" glyph. The
+        # operator tree has no top-level hasCategory, so the empty-headline fallback used to
+        # clobber it; the material still rides in its own channel (flags.material / material_text).
+        data = json.dumps(
+            {
+                "forms": [
+                    {
+                        "@type": "lcma:Form",
+                        "function": {
+                            "@type": "lcma:FunctionOperation",
+                            "operator": "fnop:fusion",
+                            "operands": [
+                                {
+                                    "@type": "lcma:Function",
+                                    "hasCategory": "fn:basic_idea",
+                                },
+                                {
+                                    "@type": "lcma:Function",
+                                    "hasCategory": "fn:contrasting_idea",
+                                },
+                            ],
+                        },
+                        "material": {
+                            "@type": "lcma:MaterialReferences",
+                            "refs": [{"ref": "Verse"}],
+                        },
+                    }
+                ]
+            }
+        )
+        m = sv.parse_span_model(data)
+        bi, ci = sv.FUNCTION_ABBR["basic_idea"], sv.FUNCTION_ABBR["contrasting_idea"]
+        assert m.primary == f"{bi}/{ci}"
+        assert m.primary_full == "Basic idea/Contrasting idea"
+        assert m.flags.operator == "fusion"
+        assert m.flags.material is True
+        assert m.material_text == "Verse"
+
+    def test_transformation_with_material_keeps_its_headline(self):
+        # todo #4, transformation side: same guard, directed-arrow glyph.
+        data = json.dumps(
+            {
+                "forms": [
+                    {
+                        "@type": "lcma:Form",
+                        "function": {
+                            "@type": "lcma:FunctionTransformation",
+                            "source": {"hasCategory": "fn:basic_idea"},
+                            "target": {"hasCategory": "fn:contrasting_idea"},
+                        },
+                        "material": {
+                            "@type": "lcma:MaterialReferences",
+                            "refs": [{"ref": "Verse"}],
+                        },
+                    }
+                ]
+            }
+        )
+        m = sv.parse_span_model(data)
+        bi, ci = sv.FUNCTION_ABBR["basic_idea"], sv.FUNCTION_ABBR["contrasting_idea"]
+        assert m.primary == f"{bi}→{ci}"
+        assert m.flags.operator == "transformation"
+        assert m.flags.material is True
+
     def test_standalone_is_grey_and_flagged(self):
         data = json.dumps(
             {
