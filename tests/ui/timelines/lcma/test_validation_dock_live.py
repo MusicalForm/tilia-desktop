@@ -49,6 +49,11 @@ def _read_js(dock, js, timeout_ms=5000):
     return result.get("v")
 
 
+def _finding_texts(dock):
+    tree = dock._tree
+    return [tree.topLevelItem(i).text(0) for i in range(tree.topLevelItemCount())]
+
+
 def test_engine_boots_and_diagnoses_empty(lcma_tl, lcma_tlui):
     dock = _dock()
     assert dock is not None
@@ -75,5 +80,54 @@ def test_recompute_runs_live_engine_and_lists_findings(lcma_tl, lcma_tlui):
         lambda: dock._tree.topLevelItemCount() >= 1
         and "clean" not in dock._summary.text()
     ), f"live engine produced no findings (summary={dock._summary.text()!r})"
+    assert "error" in dock._summary.text().lower()
+    QApplication.instance().processEvents()
+
+
+def test_unknown_committed_term_flagged_as_error(lcma_tl, lcma_tlui):
+    """A committed function outside the vocabulary — not authorable in the builder, only reachable by
+    an external .tla edit — is flagged as an error by the live engine. Minimal JSON-LD: revLabel reads
+    the compact form the app controls, so the full @context is not needed to drive the rule.
+    """
+    dock = _dock()
+    assert _wait_until(lambda: dock._engine_ready)
+    unknown = json.dumps(
+        {
+            "@type": ["lcma:AnnotationLabel"],
+            "name": "u",
+            "forms": [
+                {
+                    "@type": "lcma:Form",
+                    "function": {"@type": "lcma:Function", "hasCategory": "fn:wubwub"},
+                }
+            ],
+        }
+    )
+    unit = lcma_tl.create_lcma_form(0, 1, 1)[0]
+    lcma_tl.set_component_data(unit.id, "annotation_data", unknown)
+
+    dock._recompute()
+
+    assert _wait_until(
+        lambda: any("controlled vocabulary" in t for t in _finding_texts(dock))
+    ), f"unknown committed term not flagged (findings={_finding_texts(dock)!r})"
+    assert "error" in dock._summary.text().lower()
+    QApplication.instance().processEvents()
+
+
+def test_unreadable_unit_does_not_blind_the_pane(lcma_tl, lcma_tlui):
+    """A unit whose annotation_data is not parseable JSON — a broken external edit — is flagged as a
+    single `unreadable` error, not a whole-session engine failure that leaves the pane blank.
+    """
+    dock = _dock()
+    assert _wait_until(lambda: dock._engine_ready)
+    bad = lcma_tl.create_lcma_form(0, 1, 1)[0]
+    lcma_tl.set_component_data(bad.id, "annotation_data", "{ this is not valid json")
+
+    dock._recompute()
+
+    assert _wait_until(
+        lambda: any("Unreadable" in t for t in _finding_texts(dock))
+    ), f"malformed unit not flagged as unreadable (findings={_finding_texts(dock)!r})"
     assert "error" in dock._summary.text().lower()
     QApplication.instance().processEvents()
