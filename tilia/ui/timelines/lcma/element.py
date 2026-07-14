@@ -109,21 +109,32 @@ class LcmaFormUI(HierarchyUI):
             return self.get_data("label")
         return display_label(model, lod_for(width, model.headline_units))
 
+    def _marker_visible(self, width: float) -> bool:
+        """Whether the ⊗ validation-error marker shows at this body width. It rides with the label:
+        hidden once the unit is too small to show any label at all (``min`` LOD, where the headline
+        is already shed), so a narrow unit isn't cluttered by a symbol it has no room for."""
+        if not self._has_validation_error:
+            return False
+        model = self.span_model
+        return lod_for(width, model.headline_units if model else 1) != "min"
+
     def _display_html(self, width: float) -> str:
         """The rich multi-line HTML label for the current annotation at this body width, prefixed
-        with a ⊗ marker when the validation dock flagged this unit (see set_validation_error). Width
-        drives the LOD tier and, via setTextWidth, the wrapping — there is no substring cropping.
-        Returns ``""`` only for an unannotated, error-free unit (the plain label is painted then); an
-        unannotated/unreadable unit that IS flagged returns the marker + its raw label as HTML."""
+        with a ⊗ marker when the validation dock flagged this unit AND the unit is wide enough to
+        show a label (see _marker_visible / set_validation_error). Width drives the LOD tier and, via
+        setTextWidth, the wrapping — there is no substring cropping. Returns ``""`` for an unannotated
+        unit with no visible marker (the plain label is painted then); an unannotated/unreadable unit
+        that IS flagged (and wide enough) returns the marker + its raw label as HTML."""
         model = self.span_model
+        marker = self._marker_visible(width)
         if model is None:
-            if not self._has_validation_error:
-                return ""
-            return plain_label_html(self.get_data("label") or "", error=True)
+            return (
+                plain_label_html(self.get_data("label") or "", error=True)
+                if marker
+                else ""
+            )
         html_label = span_html(model, lod_for(width, model.headline_units))
-        return (
-            add_error_marker(html_label) if self._has_validation_error else html_label
-        )
+        return add_error_marker(html_label) if marker else html_label
 
     @property
     def ui_color(self):
@@ -175,13 +186,14 @@ class LcmaFormUI(HierarchyUI):
         )
 
     def _render_label(self, start_x, end_x, level, height):
-        """Paint the label: the rich HTML breakdown (with a ⊗ marker when the dock flagged an error)
-        when annotated, the plain unit label when not. The width (end_x - start_x) drives both the
-        LOD tier and the text-wrapping width."""
+        """Paint the label: the rich HTML breakdown (with a ⊗ marker when the dock flagged an error
+        and the unit is wide enough) when annotated, the plain unit label when not. The width
+        (end_x - start_x) drives both the LOD tier and the text-wrapping width."""
         width = end_x - start_x
-        # Everything but an unannotated, error-free unit paints as HTML (so the ⊗ marker can prefix
-        # even an unreadable unit's raw label); _display_html composes the marker in one place.
-        if self.span_model is None and not self._has_validation_error:
+        # An unannotated unit paints plain text — unless it carries the ⊗ marker at this width, which
+        # needs HTML. _display_html composes the marker (and sheds it once the unit is too small to
+        # show any label) in one place.
+        if self.span_model is None and not self._marker_visible(width):
             self.label.set_plain(self.get_data("label") or "", width)
         else:
             self.label.set_html(self._display_html(width), width)

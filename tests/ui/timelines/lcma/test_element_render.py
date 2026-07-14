@@ -178,14 +178,17 @@ class TestValidationErrorMarker:
         el.set_validation_error(False)
         assert _MARK not in el._display_html(250)
 
-    def test_marker_shows_at_min_lod_where_headline_is_gone(self, lcma_form_ui):
-        # A narrow unit sheds its headline to '' at 'min'; the error must still be visible, so the
-        # marker is a leading glyph rather than a headline-trailing badge like ⚠.
+    def test_marker_hidden_at_min_lod_when_unit_too_small(self, lcma_form_ui):
+        # The marker rides with the label and sheds once the unit is too small to show any label at
+        # all ('min' LOD, width < 32) — it must not linger on a unit that shows nothing else.
         el = lcma_form_ui
         el.set_data("annotation_data", _jsonld())
-        assert el._display_html(10) == ""  # min LOD: empty label when clean
         el.set_validation_error(True)
-        assert _MARK in el._display_html(10)
+        assert _MARK not in el._display_html(10)  # min LOD: marker gone
+        assert el._display_html(10) == ""  # ... nothing paints at all
+        # still shown while the unit is wide enough to carry a label ('short' and up)
+        assert _MARK in el._display_html(40)
+        assert _MARK in el._display_html(250)
 
     def test_flagged_unreadable_unit_shows_marker_over_raw_label(self, lcma_form_ui):
         # An externally-edited unit whose annotation_data is malformed JSON: no span model, so it
@@ -201,6 +204,17 @@ class TestValidationErrorMarker:
         assert "raw" in html  # the raw label is preserved alongside the marker
         el.update_label(0, 300)
         assert _MARK in el.label.toPlainText()
+
+    def test_unreadable_marker_hidden_at_min_lod(self, lcma_form_ui):
+        # The shed applies to the unreadable path too: a too-small unreadable unit falls back to its
+        # plain label with no marker, like any other too-small unit.
+        el = lcma_form_ui
+        el.set_data("label", "raw")
+        el.set_data("annotation_data", "{ this is not valid json")
+        el.set_validation_error(True)
+        assert _MARK not in el._display_html(10)  # min LOD: no marker
+        el.update_label(0, 10)
+        assert _MARK not in el.label.toPlainText()
 
     def test_unflagged_unreadable_unit_is_plain_without_marker(self, lcma_form_ui):
         el = lcma_form_ui
