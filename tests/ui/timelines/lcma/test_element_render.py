@@ -147,3 +147,78 @@ class TestLiveRepaintLynchpin:
         el.set_data("annotation_data", "")
         assert el.span_model is None
         assert _name(el.body.brush().color().name()) == _name(el.level_color)
+
+
+# The ⊗ error marker (todo #3): the validation dock calls set_validation_error() after its session
+# lint; the element paints a leading ⊗ over the headline. Diagnose-driven, so these drive it
+# directly (the dock-> element propagation is covered in test_validation_dock.py). ⊗ = U+2297.
+_MARK = "⊗"
+
+
+class TestValidationErrorMarker:
+    def test_flagged_annotated_unit_shows_marker(self, lcma_form_ui):
+        el = lcma_form_ui
+        el.set_data("annotation_data", _jsonld())
+        assert _MARK not in el._display_html(250)  # clean by default
+
+        el.set_validation_error(True)
+        html = el._display_html(250)
+        assert _MARK in html  # leading marker
+        assert "Theme A" in html  # ... and the headline still renders
+        # the marker reaches the painted label, not just the projection accessor
+        el.update_label(0, 300)
+        assert _MARK in el.label.toPlainText()
+
+    def test_marker_clears_when_error_resolves(self, lcma_form_ui):
+        el = lcma_form_ui
+        el.set_data("annotation_data", _jsonld())
+        el.set_validation_error(True)
+        assert _MARK in el._display_html(250)
+
+        el.set_validation_error(False)
+        assert _MARK not in el._display_html(250)
+
+    def test_marker_shows_at_min_lod_where_headline_is_gone(self, lcma_form_ui):
+        # A narrow unit sheds its headline to '' at 'min'; the error must still be visible, so the
+        # marker is a leading glyph rather than a headline-trailing badge like ⚠.
+        el = lcma_form_ui
+        el.set_data("annotation_data", _jsonld())
+        assert el._display_html(10) == ""  # min LOD: empty label when clean
+        el.set_validation_error(True)
+        assert _MARK in el._display_html(10)
+
+    def test_flagged_unreadable_unit_shows_marker_over_raw_label(self, lcma_form_ui):
+        # An externally-edited unit whose annotation_data is malformed JSON: no span model, so it
+        # renders the plain hierarchy label — but the ⊗ must still surface the error.
+        el = lcma_form_ui
+        el.set_data("label", "raw")
+        el.set_data("annotation_data", "{ this is not valid json")
+        assert el.span_model is None  # unreadable -> plain fallback
+
+        el.set_validation_error(True)
+        html = el._display_html(250)
+        assert _MARK in html
+        assert "raw" in html  # the raw label is preserved alongside the marker
+        el.update_label(0, 300)
+        assert _MARK in el.label.toPlainText()
+
+    def test_unflagged_unreadable_unit_is_plain_without_marker(self, lcma_form_ui):
+        el = lcma_form_ui
+        el.set_data("label", "raw")
+        el.set_data("annotation_data", "{ this is not valid json")
+        assert (
+            el._display_html(250) == ""
+        )  # no error -> plain label path, no HTML marker
+        el.update_label(0, 300)
+        assert _MARK not in el.label.toPlainText()
+
+    def test_repaint_skipped_when_flag_unchanged(self, lcma_form_ui, monkeypatch):
+        el = lcma_form_ui
+        el.set_data("annotation_data", _jsonld())
+        el.set_validation_error(True)
+        calls = []
+        monkeypatch.setattr(el, "update_label", lambda *a, **k: calls.append(True))
+        el.set_validation_error(True)  # no change -> no repaint
+        assert calls == []
+        el.set_validation_error(False)  # change -> repaint
+        assert calls == [True]

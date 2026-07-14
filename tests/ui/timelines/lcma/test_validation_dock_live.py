@@ -20,6 +20,8 @@ import pytest
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication
 
+from tilia.requests import Get, get
+
 pytestmark = pytest.mark.skipif(
     os.environ.get("LCMA_LIVE") != "1",
     reason="live webview test; set LCMA_LIVE=1 to run",
@@ -130,4 +132,23 @@ def test_unreadable_unit_does_not_blind_the_pane(lcma_tl, lcma_tlui):
         lambda: any("Unreadable" in t for t in _finding_texts(dock))
     ), f"malformed unit not flagged as unreadable (findings={_finding_texts(dock)!r})"
     assert "error" in dock._summary.text().lower()
+
+def test_live_error_marks_the_flagged_unit_elements(lcma_tl, lcma_tlui):
+    # End-to-end for todo #3: a real diagnoseSession error flows back onto the units' elements as
+    # the ⊗ marker (set_validation_error), not only into the dock tree.
+    dock = _dock()
+    assert _wait_until(lambda: dock._engine_ready)
+    label = json.dumps({"name": "x", "forms": []})
+    units = []
+    for start, end in ((0, 1), (1, 2)):  # duplicate name -> a real error on both units
+        unit = lcma_tl.create_lcma_form(start, end, 1)[0]
+        lcma_tl.set_component_data(unit.id, "annotation_data", label)
+        units.append(unit)
+
+    dock._recompute()  # real engine; _update_element_markers runs in the same _on_diagnostics
+
+    assert _wait_until(lambda: "error" in dock._summary.text().lower())
+    for unit in units:
+        element = get(Get.TIMELINE_UI_ELEMENT, dock._tl_id, unit.id)
+        assert element._has_validation_error is True
     QApplication.instance().processEvents()

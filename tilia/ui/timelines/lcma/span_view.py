@@ -506,7 +506,11 @@ def parse_span_model(jsonld: str) -> SpanModel | None:
             # shorthand) would otherwise fall back to the empty-headline em dash and hide the
             # ref entirely at low LOD. Surface it as the "repeat" placeholder glyph + the ref,
             # e.g. "% [ref]", mirroring how a real repeat placeholder renders its headline.
-            if not fn.get("hasCategory") and not fn.get("provisionalTerm") and material_text:
+            if (
+                not fn.get("hasCategory")
+                and not fn.get("provisionalTerm")
+                and material_text
+            ):
                 repeat_abbr = _abbr(PLACEHOLDER_ABBR, "repeat")
                 primary = primary_full = f"{repeat_abbr} [{material_text}]"
             uncertain = form.get("certainty") == "uncertain"
@@ -683,10 +687,36 @@ def span_tooltip(m: SpanModel) -> str:
 _HTML_TEXT = "#1a1a1a"  # near-black headline over the pale family fill
 _HTML_MUTED = "#5b6170"  # secondary channels (name, type, material, attributes)
 _HTML_PROV = "#b8860b"  # amber — a proposed (⚠) term, the editor's provisional accent
+_HTML_ERROR = (
+    "#c0392b"  # red — a validation ERROR (⊗), matching the dock's error colour
+)
 
 
 def _esc(value: str) -> str:
     return html.escape(value or "", quote=False)
+
+
+# A leading ⊗ marks a unit whose annotation has a validation ERROR (a term not in the controlled
+# vocabulary, an unreadable JSON-LD, a dangling reference, ...). The counterpart of the ⚠ proposed-
+# term badge, but DIAGNOSE-driven: the validation dock sets it from the session lint (the single
+# authority), never derived from the unit's own data here. A leading marker — not a headline-
+# trailing badge like ⚠ — so it survives every LOD tier: it shows even at 'min' (no headline) and
+# on an unreadable unit that has no headline to hang off.
+_ERROR_MARKER = f'<span style="color:{_HTML_ERROR}">⊗ </span>'
+
+
+def add_error_marker(inner_html: str) -> str:
+    """Prefix a rendered label (``span_html`` output) with the ⊗ validation-error marker."""
+    return _ERROR_MARKER + inner_html
+
+
+def plain_label_html(text: str, *, error: bool = False) -> str:
+    """The unannotated/unreadable unit label as (escaped) HTML — used when there is no SpanModel but
+    the dock flagged an error, so the ⊗ marker shows without a headline to hang off. ``error=False``
+    returns the bare escaped text (the plain-label fallback still uses ``set_plain``, so this is only
+    called with ``error=True`` today, but the flag keeps it a total function)."""
+    inner = _esc(text)
+    return add_error_marker(inner) if error else inner
 
 
 def _headline_html(m: SpanModel, abbreviate: bool) -> str:

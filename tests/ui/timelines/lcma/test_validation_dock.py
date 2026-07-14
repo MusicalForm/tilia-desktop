@@ -14,6 +14,8 @@ import json
 
 from PySide6.QtCore import Qt
 
+from tilia.requests import Get, get
+
 
 def _dock():
     from tilia.ui.timelines.lcma.validation_dock import get_validation_dock_if_exists
@@ -128,6 +130,92 @@ class TestClickSelectsUnit:
         dock._on_item_clicked(dock._tree.topLevelItem(0), 0)
 
         assert unit.id in [el.id for el in lcma_tlui.selected_elements]
+
+
+class TestElementErrorMarkers:
+    """The dock mirrors each unit's worst severity onto its element (todo #3): an ERROR flags the
+    element so it paints the ⊗ marker, anything else clears it. Here the finding JSON is fed
+    directly; the element-side paint is covered in test_element_render.TestValidationErrorMarker."""
+
+    @staticmethod
+    def _element(dock, cmp_id):
+        return get(Get.TIMELINE_UI_ELEMENT, dock._tl_id, cmp_id)
+
+    def test_error_finding_flags_the_units_element(self, lcma_tlui, lcma_tl):
+        dock = _dock()
+        unit = lcma_tl.create_lcma_form(0, 1, 1)[0]
+        dock._ordered_ids = [unit.id]  # as a recompute would have set
+        _feed(
+            dock,
+            [
+                {
+                    "index": 0,
+                    "name": "",
+                    "severity": "error",
+                    "code": "x",
+                    "message": "m",
+                }
+            ],
+        )
+        assert self._element(dock, unit.id)._has_validation_error is True
+
+    def test_warning_finding_does_not_flag_the_element(self, lcma_tlui, lcma_tl):
+        dock = _dock()
+        unit = lcma_tl.create_lcma_form(0, 1, 1)[0]
+        dock._ordered_ids = [unit.id]
+        _feed(
+            dock,
+            [
+                {
+                    "index": 0,
+                    "name": "",
+                    "severity": "warning",
+                    "code": "proposed-term",
+                    "message": "m",
+                }
+            ],
+        )
+        assert self._element(dock, unit.id)._has_validation_error is False
+
+    def test_marker_clears_on_next_clean_recompute(self, lcma_tlui, lcma_tl):
+        dock = _dock()
+        unit = lcma_tl.create_lcma_form(0, 1, 1)[0]
+        dock._ordered_ids = [unit.id]
+        _feed(
+            dock,
+            [
+                {
+                    "index": 0,
+                    "name": "",
+                    "severity": "error",
+                    "code": "x",
+                    "message": "m",
+                }
+            ],
+        )
+        assert self._element(dock, unit.id)._has_validation_error is True
+        _feed(dock, [])  # the error was resolved
+        assert self._element(dock, unit.id)._has_validation_error is False
+
+    def test_only_the_flagged_unit_among_several_is_marked(self, lcma_tlui, lcma_tl):
+        dock = _dock()
+        u0 = lcma_tl.create_lcma_form(0, 1, 1)[0]
+        u1 = lcma_tl.create_lcma_form(1, 2, 1)[0]
+        dock._ordered_ids = [u0.id, u1.id]  # natural order: level, start
+        _feed(
+            dock,
+            [
+                {
+                    "index": 1,
+                    "name": "",
+                    "severity": "error",
+                    "code": "x",
+                    "message": "m",
+                }
+            ],
+        )
+        assert self._element(dock, u0.id)._has_validation_error is False
+        assert self._element(dock, u1.id)._has_validation_error is True
 
 
 class TestRefreshFilter:

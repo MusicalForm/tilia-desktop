@@ -13,9 +13,11 @@ from tilia.ui.timelines.hierarchy.element import (
 )
 from tilia.ui.timelines.lcma.context_menu import LcmaFormContextMenu
 from tilia.ui.timelines.lcma.span_view import (
+    add_error_marker,
     display_label,
     lod_for,
     parse_span_model,
+    plain_label_html,
     span_html,
     span_tooltip,
 )
@@ -78,6 +80,11 @@ class LcmaFormUI(HierarchyUI):
         # the span model.
         self._span_model_src: str | None = None
         self._span_model = None
+        # Whether the validation dock's last session lint flagged this unit with an ERROR; drives
+        # the ⊗ marker in _render_label. Set BEFORE super().__init__ (whose _setup_label paints the
+        # label) and updated later via set_validation_error. Diagnose-driven — the element never
+        # lints itself.
+        self._has_validation_error = False
         super().__init__(*args, **kwargs)
         self._update_tooltip()
 
@@ -103,13 +110,20 @@ class LcmaFormUI(HierarchyUI):
         return display_label(model, lod_for(width, model.headline_units))
 
     def _display_html(self, width: float) -> str:
-        """The rich multi-line HTML label for the current annotation at this body width, or ``""``
-        when unannotated (the plain label is painted then). Width drives the LOD tier and, via
-        setTextWidth, the wrapping — there is no substring cropping."""
+        """The rich multi-line HTML label for the current annotation at this body width, prefixed
+        with a ⊗ marker when the validation dock flagged this unit (see set_validation_error). Width
+        drives the LOD tier and, via setTextWidth, the wrapping — there is no substring cropping.
+        Returns ``""`` only for an unannotated, error-free unit (the plain label is painted then); an
+        unannotated/unreadable unit that IS flagged returns the marker + its raw label as HTML."""
         model = self.span_model
         if model is None:
-            return ""
-        return span_html(model, lod_for(width, model.headline_units))
+            if not self._has_validation_error:
+                return ""
+            return plain_label_html(self.get_data("label") or "", error=True)
+        html_label = span_html(model, lod_for(width, model.headline_units))
+        return (
+            add_error_marker(html_label) if self._has_validation_error else html_label
+        )
 
     @property
     def ui_color(self):
@@ -161,16 +175,16 @@ class LcmaFormUI(HierarchyUI):
         )
 
     def _render_label(self, start_x, end_x, level, height):
-        """Paint the label: the rich HTML breakdown when annotated, the plain unit label when not.
-        The width (end_x - start_x) drives both the LOD tier and the text-wrapping width."""
+        """Paint the label: the rich HTML breakdown (with a ⊗ marker when the dock flagged an error)
+        when annotated, the plain unit label when not. The width (end_x - start_x) drives both the
+        LOD tier and the text-wrapping width."""
         width = end_x - start_x
-        model = self.span_model
-        if model is None:
+        # Everything but an unannotated, error-free unit paints as HTML (so the ⊗ marker can prefix
+        # even an unreadable unit's raw label); _display_html composes the marker in one place.
+        if self.span_model is None and not self._has_validation_error:
             self.label.set_plain(self.get_data("label") or "", width)
         else:
-            self.label.set_html(
-                span_html(model, lod_for(width, model.headline_units)), width
-            )
+            self.label.set_html(self._display_html(width), width)
         self.label.set_position(start_x, height, level)
 
     def update_label(self, start_x=None, end_x=None, level=None, height=None):
@@ -192,6 +206,15 @@ class LcmaFormUI(HierarchyUI):
         self.update_label()
         self._apply_notional_border()
         self._update_tooltip()
+
+    def set_validation_error(self, has_error: bool) -> None:
+        """Show or hide the ⊗ validation-error marker on this unit. Called by the LCMA validation
+        dock after it runs the session lint (diagnose is the single authority — the element does not
+        re-run it). Repaints the label only when the flag actually changes."""
+        if has_error == self._has_validation_error:
+            return
+        self._has_validation_error = has_error
+        self.update_label()
 
     def _update_tooltip(self):
         model = self.span_model
