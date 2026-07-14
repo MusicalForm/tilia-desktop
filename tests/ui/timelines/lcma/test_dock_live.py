@@ -62,6 +62,27 @@ def _commit_function_js(value: str) -> str:
     )
 
 
+def _walk_function_js(value: str) -> str:
+    # Like _commit_function_js but a PLAIN Enter (no ⌘/Ctrl): the analyst WALKS OFF the function slot
+    # rather than force-committing. advance() folds the buffer in and persists the draft live
+    # (onLiveEdit -> backend.save_annotation) — the sticky-editor path TiLiA's analysts actually use,
+    # and the one auto-naming has to ride too (they don't press ⌘⏎).
+    return (
+        "(function () {"
+        f"  var v = {json.dumps(value)};"
+        "  var input = document.querySelector('input');"
+        "  if (!input) return 'no-input';"
+        "  var setter = Object.getOwnPropertyDescriptor("
+        "    window.HTMLInputElement.prototype, 'value').set;"
+        "  setter.call(input, v);"
+        "  input.dispatchEvent(new Event('input', { bubbles: true }));"
+        "  input.dispatchEvent(new KeyboardEvent('keydown',"
+        "    { key: 'Enter', bubbles: true }));"
+        "  return 'ok';"
+        "})()"
+    )
+
+
 def _wait_until(predicate, timeout_ms=20000, step_ms=50) -> bool:
     waited = 0
     while waited < timeout_ms:
@@ -160,6 +181,43 @@ def test_session_units_drive_autoname_increment(lcma_tl, lcma_form, lcma_tlui):
         _run_js(dock, _commit_function_js("verse"))
         assert _wait_until(lambda: "v2" in (b.annotation_data or "")), (
             "unit B was not auto-incremented to 'v2' (setSessionUnits did not reach autoName): "
+            f"{b.annotation_data!r}"
+        )
+    finally:
+        dock.deleteLater()
+        QApplication.instance().processEvents()
+
+
+def test_walk_off_autonames(lcma_tl, lcma_form, lcma_tlui):
+    """Auto-naming must ride the LIVE-persist path, not just ⌘⏎. The embed is a sticky live-save
+    editor (builder_dock): walking off a slot with a PLAIN ⏎ (or Tab / blur) persists the unit
+    without a ⌘⏎ — the way analysts actually commit. So a blank-named verse walked off must be
+    auto-named the bare 'v', and a second one must number to 'v2', exactly as ⌘⏎ does.
+    """
+    from tilia.ui.timelines.lcma.builder_dock import LcmaBuilderDock
+
+    dock = LcmaBuilderDock()
+    try:
+        assert _wait_until(lambda: dock._bridge_ready), "bridge never became ready"
+
+        # Unit A: bind, type a verse, WALK the slot (plain ⏎, no meta). The live persist must
+        # auto-name it -> @id anno:v, without any ⌘⏎.
+        dock.load_annotation(lcma_tl.id, lcma_form.id, "")
+        QTest.qWait(400)
+        _run_js(dock, _walk_function_js("verse"))
+        assert _wait_until(lambda: '"anno:v"' in (lcma_form.annotation_data or "")), (
+            "walking off a verse did not auto-name it 'v' (live-save skipped autoName): "
+            f"{lcma_form.annotation_data!r}"
+        )
+
+        # Unit B: binding pushes A's committed name over setSessionUnits; walking off B's verse must
+        # number it v2, proving the session count reaches the live path too.
+        b = lcma_tl.create_lcma_form(2, 3, 1)[0]
+        dock.load_annotation(lcma_tl.id, b.id, "")
+        QTest.qWait(600)
+        _run_js(dock, _walk_function_js("verse"))
+        assert _wait_until(lambda: "v2" in (b.annotation_data or "")), (
+            "walking off a second verse did not auto-increment to 'v2': "
             f"{b.annotation_data!r}"
         )
     finally:
