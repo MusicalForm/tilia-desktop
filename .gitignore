@@ -9,6 +9,7 @@ venv
 .venv
 __pycache__
 tilia/dev
+.todo.md
 
 # IDEs
 .vscode
