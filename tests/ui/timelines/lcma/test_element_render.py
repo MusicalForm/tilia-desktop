@@ -1,4 +1,4 @@
-"""LcmaFormUI render tests: the annotation drives the rectangle (family fill + headline +
+"""LcmaFormUI render tests: the annotation drives the rectangle (level fill + headline +
 tooltip), and a builder-dock-style edit live-repaints it (the UPDATE_TRIGGERS lynchpin).
 
 These exercise the real update path: ``element.set_data("annotation_data", ...)`` flows
@@ -35,13 +35,13 @@ class TestUnannotated:
 
 
 class TestAnnotatedRender:
-    def test_body_fill_is_family_colour(self, lcma_form_ui):
+    def test_body_fill_is_level_colour(self, lcma_form_ui):
+        # The annotation drives the headline, but the FILL is the band's level colour, not the
+        # function family (todo #1): an annotated unit matches a plain one at the same level.
         el = lcma_form_ui
         el.set_data("annotation_data", _jsonld())
         assert el.span_model is not None
-        assert _name(el.body.brush().color().name()) == _name(
-            sv.span_fill_hex("Basic idea")
-        )
+        assert _name(el.body.brush().color().name()) == _name(el.level_color)
 
     def test_label_shows_headline_at_full_width(self, lcma_form_ui):
         el = lcma_form_ui
@@ -111,7 +111,7 @@ class TestAnnotatedRender:
         assert "Theme A" in el.body.toolTip()
         assert "Theme A" in el.label.toolTip()
 
-    def test_user_colour_overrides_family(self, lcma_form_ui):
+    def test_user_colour_overrides_level(self, lcma_form_ui):
         el = lcma_form_ui
         el.set_data("annotation_data", _jsonld())
         el.set_data("color", "#123456")
@@ -124,19 +124,16 @@ class TestLiveRepaintLynchpin:
 
     def test_edit_repaints_fill_label_and_tooltip(self, lcma_form_ui):
         el = lcma_form_ui
-        # connective amber -> closing red: a single edit must move every channel.
+        # A single edit must move every annotation channel (headline + tooltip). The FILL stays
+        # the band's level colour regardless of function (todo #1), so it does not track the edit.
         el.set_data("annotation_data", _jsonld(name="Br", category="fn:transition"))
-        assert _name(el.body.brush().color().name()) == _name(
-            sv.span_fill_hex("Transition")
-        )
+        assert _name(el.body.brush().color().name()) == _name(el.level_color)
         assert sv.FUNCTION_ABBR["transition"] in el._display_text(250)
         assert "Br" in el.body.toolTip()  # name + full term live in the tooltip
         assert "Transition" in el.body.toolTip()
 
         el.set_data("annotation_data", _jsonld(name="Cad", category="fn:cadence"))
-        assert _name(el.body.brush().color().name()) == _name(
-            sv.span_fill_hex("Cadence")
-        )
+        assert _name(el.body.brush().color().name()) == _name(el.level_color)
         assert sv.FUNCTION_ABBR["cadence"] in el._display_text(250)
         assert "Cad" in el.body.toolTip()
         assert "Cadence" in el.body.toolTip()

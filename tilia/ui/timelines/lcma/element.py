@@ -27,10 +27,10 @@ class LcmaFormUI(HierarchyUI):
     """UI element for an LCMA form unit.
 
     Renders the unit's ``annotation_data`` (a JSON-LD label) using the LCMA "zoomed-out"
-    render contract (``span_view``): the body fill is the function-family colour, and the
-    inline label is the annotation headline (name · function | type · badges) shed by
-    level-of-detail as the span narrows. An explicit user colour still wins, and an
-    un-annotated unit falls back to a plain hierarchy render.
+    render contract (``span_view``): the body fill is the band's level colour (like a plain
+    hierarchy — the function-family hue in ``span_view`` is the web's colour identity, not
+    painted here), and the inline label is the annotation headline (name · function | type ·
+    badges) shed by level-of-detail as the span narrows. An explicit user colour still wins.
 
     The class also owns the ``LCMA_FORM -> element class`` dispatch, the LCMA-namespaced
     context menu, and the builder-dock wiring.
@@ -138,10 +138,10 @@ class LcmaFormUI(HierarchyUI):
 
     @property
     def ui_color(self):
-        base_color = self.get_data("color")
-        if not base_color:
-            model = self.span_model
-            base_color = model.color if model else self.level_color
+        # Fill by the band's LEVEL colour, exactly like a plain hierarchy (todo #1): the
+        # function-family hue is deliberately NOT painted, so a unit keeps its level's default
+        # colour regardless of its function/category. An explicit user colour still wins.
+        base_color = self.get_data("color") or self.level_color
         return (
             base_color
             if not self.is_selected()
