@@ -135,11 +135,19 @@ def _named_jsonld():
 
 
 class TestParse:
-    def test_empty_and_garbage_are_none(self):
-        assert sv.parse_span_model("") is None
-        assert sv.parse_span_model("   ") is None
+    def test_empty_is_placeholder_garbage_is_none(self):
+        # An empty annotation projects the empty-form PLACEHOLDER ("—" headline) so an un-annotated
+        # LCMA unit still renders as an LCMA form (todo #2). Only unparseable / non-object input
+        # returns None (the raw-label fallback).
+        for empty in ("", "   "):
+            m = sv.parse_span_model(empty)
+            assert m is not None, empty
+            assert m.primary == "—"
         assert sv.parse_span_model("not json") is None
         assert sv.parse_span_model("[1,2,3]") is None  # not an object
+
+    def test_empty_matches_empty_span_model(self):
+        assert sv.parse_span_model("") == sv.empty_span_model()
 
     def test_named_form(self):
         m = sv.parse_span_model(_named_jsonld())
@@ -570,7 +578,9 @@ class TestRobustness:
         ' "formalType":"oops"}]}',  # formalType not an object
     ]
 
-    NON_MODELS = ["", "   ", "not json", "[1,2,3]", "42", "null", '"hi"']
+    # Empty / whitespace are NOT here: they project the empty-form placeholder, not None
+    # (see TestParse.test_empty_is_placeholder_garbage_is_none). These are true non-objects.
+    NON_MODELS = ["not json", "[1,2,3]", "42", "null", '"hi"']
 
     def test_non_objects_return_none(self):
         for data in self.NON_MODELS:

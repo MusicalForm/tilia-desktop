@@ -25,13 +25,57 @@ def _name(color: str) -> str:
 
 
 class TestUnannotated:
-    def test_falls_back_to_plain_hierarchy(self, lcma_form_ui):
-        # A fresh unit has no annotation: no span model, plain (level) colour, raw label.
+    def test_empty_unit_renders_as_empty_lcma_form(self, lcma_form_ui):
+        # A fresh unit has no annotation, but it still renders as an (empty) LCMA form — the "—"
+        # em-dash placeholder headline — not a blank band (todo #2). The fill is the level colour
+        # (like every LCMA unit since todo #1); the empty state reads from the label, not the fill.
         el = lcma_form_ui
-        assert el.span_model is None
-        assert _name(el.body.brush().color().name()) == _name(el.level_color)
+        assert (
+            el.span_model is not None
+        )  # placeholder model, not the None (malformed) fallback
+        assert el._display_text(250) == "—"  # em-dash headline
+        assert _name(el.body.brush().color().name()) == _name(
+            el.level_color
+        )  # level fill
+        assert el.body.toolTip() == ""  # nothing annotated yet -> no tooltip
+
+    def test_empty_unit_ignores_a_stale_label(self, lcma_form_ui):
+        # A label attr lingering on the unit must not resurface: an un-annotated LCMA unit shows
+        # the empty-form placeholder, never the raw label.
+        el = lcma_form_ui
         el.set_data("label", "raw")
-        assert el._display_text(250) == "raw"
+        assert el._display_text(250) == "—"
+
+
+class TestEmptyUnitFormatting:
+    """todo #2: an un-annotated LCMA unit — the initial unit of a fresh timeline, or either half of
+    splitting an empty unit — renders as an empty LCMA form (the "—" placeholder headline), not a
+    blank band. The fill stays the level colour (todo #1). Regression guard for the reported bug."""
+
+    def _is_empty_form(self, el) -> bool:
+        return el._display_text(250) == "—" and _name(
+            el.body.brush().color().name()
+        ) == _name(el.level_color)
+
+    def test_initial_unit_of_fresh_timeline_is_an_empty_lcma_form(self, tls, tluis):
+        # The exact repro: a brand-new LCMA timeline's auto-created unit must show the "—" headline,
+        # not paint as a blank band.
+        from tilia.timelines.lcma.timeline import LcmaTimeline
+
+        tl = tls.create_timeline(LcmaTimeline)  # keeps the auto-created initial unit
+        tlui = tluis.get_timeline_ui(tl.id)
+        el = tlui.get_element(next(iter(tl)).id)
+        assert self._is_empty_form(el)
+
+    def test_splitting_an_empty_unit_leaves_both_halves_empty_forms(
+        self, lcma_tlui, lcma_tl
+    ):
+        # Splitting the un-annotated unit keeps both halves empty LCMA forms ("—"), not blank bands.
+        lcma_tl.create_lcma_form(0, 10, 1)
+        lcma_tl.split(5)
+        assert len(lcma_tl) == 2
+        for comp in lcma_tl:
+            assert self._is_empty_form(lcma_tlui.get_element(comp.id))
 
 
 class TestAnnotatedRender:
@@ -138,12 +182,14 @@ class TestLiveRepaintLynchpin:
         assert "Cad" in el.body.toolTip()
         assert "Cadence" in el.body.toolTip()
 
-    def test_clearing_annotation_reverts_to_plain(self, lcma_form_ui):
+    def test_clearing_annotation_reverts_to_empty_form(self, lcma_form_ui):
         el = lcma_form_ui
         el.set_data("annotation_data", _jsonld())
         el.set_data("annotation_data", "")
-        assert el.span_model is None
+        assert el.span_model is not None  # back to the empty-form placeholder
+        assert el._display_text(250) == "—"  # "—" headline, not a blank label
         assert _name(el.body.brush().color().name()) == _name(el.level_color)
+        assert el.body.toolTip() == ""  # tooltip cleared with the annotation
 
 
 # The ⊗ error marker (todo #3): the validation dock calls set_validation_error() after its session

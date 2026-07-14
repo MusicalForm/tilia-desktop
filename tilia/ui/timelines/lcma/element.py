@@ -101,9 +101,9 @@ class LcmaFormUI(HierarchyUI):
 
     def _display_text(self, width: float) -> str:
         """The plain, single-line projection of the annotation at this body width (the abbreviated
-        headline + badges), or the raw hierarchy label when there is no annotation. Backs the
-        tooltip-adjacent/plain consumers and the render tests; the painted label is the rich
-        multi-line HTML from ``_display_html``."""
+        headline + badges). An un-annotated unit projects the "—" placeholder; only a malformed
+        annotation falls back to the raw hierarchy label. Backs the plain consumers and the render
+        tests; the painted label is the rich multi-line HTML from ``_display_html``."""
         model = self.span_model
         if model is None:
             return self.get_data("label")
@@ -122,9 +122,10 @@ class LcmaFormUI(HierarchyUI):
         """The rich multi-line HTML label for the current annotation at this body width, prefixed
         with a ⊗ marker when the validation dock flagged this unit AND the unit is wide enough to
         show a label (see _marker_visible / set_validation_error). Width drives the LOD tier and, via
-        setTextWidth, the wrapping — there is no substring cropping. Returns ``""`` for an unannotated
-        unit with no visible marker (the plain label is painted then); an unannotated/unreadable unit
-        that IS flagged (and wide enough) returns the marker + its raw label as HTML."""
+        setTextWidth, the wrapping — there is no substring cropping. Returns ``""`` for a
+        malformed/unreadable unit (model is None) with no visible marker (the plain label is painted
+        then); such a unit that IS flagged (and wide enough) returns the marker + its raw label as
+        HTML. An un-annotated unit has a placeholder model, so it renders the ``—`` headline here."""
         model = self.span_model
         marker = self._marker_visible(width)
         if model is None:
@@ -230,7 +231,10 @@ class LcmaFormUI(HierarchyUI):
 
     def _update_tooltip(self):
         model = self.span_model
-        tooltip = span_tooltip(model) if model else ""
+        # An un-annotated unit renders the "—" placeholder but carries no tooltip — the bare
+        # em-dash describes nothing. Malformed input (model is None) likewise gets none.
+        annotated = bool((self.get_data("annotation_data") or "").strip())
+        tooltip = span_tooltip(model) if (model and annotated) else ""
         self.body.setToolTip(tooltip)
         self.label.setToolTip(tooltip)
 
