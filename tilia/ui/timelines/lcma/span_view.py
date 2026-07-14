@@ -430,12 +430,23 @@ def _material_text(material) -> str:
     return _refs_text(material)
 
 
+def empty_span_model() -> SpanModel:
+    """The placeholder projection of an un-annotated LCMA unit: an em-dash (``—``) headline — the
+    "form with nothing filled in yet" look — so a fresh or freshly-split LCMA unit reads as an
+    (empty) LCMA form on the timeline instead of a blank band (todo #2). ``SpanModel`` already
+    defaults the headline to ``—``; ``color`` carries the grey no-family identity (the element
+    paints the band's level colour, not this, since todo #1 — but the model stays presentation-
+    agnostic and reports the same colour identity every other model does)."""
+    return SpanModel(color=span_fill_hex(""))
+
+
 def parse_span_model(jsonld: str) -> SpanModel | None:
-    """Project the builder's JSON-LD into a SpanModel. Returns None for empty / unparseable
-    input, so the caller can fall back to a plain hierarchy render (unannotated unit).
+    """Project the builder's JSON-LD into a SpanModel. Empty input yields the empty-form
+    PLACEHOLDER model (``—`` headline) so an un-annotated LCMA unit still renders as an LCMA form;
+    only genuinely unparseable input returns None, letting the caller fall back to the raw label.
     """
     if not jsonld or not jsonld.strip():
-        return None
+        return empty_span_model()
     try:
         node = json.loads(jsonld)
     except (ValueError, TypeError):
