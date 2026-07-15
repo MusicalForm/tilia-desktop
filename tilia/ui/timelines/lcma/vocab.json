@@ -3,9 +3,8 @@
     "specific": [
       {
         "name": "a_aaba",
-        "abbr": "a",
+        "abbr": "a_aaba",
         "aliases": [
-          "a_aaba",
           "aaba-a"
         ],
         "subtypes": []
@@ -525,6 +524,13 @@
         "subtypes": []
       },
       {
+        "name": "skit",
+        "abbr": "skit",
+        "aliases": [],
+        "status": "provisional",
+        "subtypes": []
+      },
+      {
         "name": "solo",
         "abbr": "so",
         "aliases": [
@@ -951,6 +957,16 @@
         ]
       },
       {
+        "name": "small_AABA",
+        "abbr": "saaba",
+        "aliases": [
+          "small",
+          "small aaba",
+          "small_aaba"
+        ],
+        "subtypes": []
+      },
+      {
         "name": "sonata_form",
         "abbr": "sonata",
         "aliases": [
@@ -1070,6 +1086,15 @@
       "string_writable": false
     },
     {
+      "name": "development",
+      "abbr": "**",
+      "aliases": [
+        "dev"
+      ],
+      "symbol": "**",
+      "string_writable": false
+    },
+    {
       "name": "diminution",
       "abbr": "$dim",
       "aliases": [
@@ -1089,11 +1114,11 @@
     },
     {
       "name": "interpolation",
-      "abbr": "**",
+      "abbr": "$interp",
       "aliases": [
         "interp"
       ],
-      "symbol": "**",
+      "symbol": "$interp",
       "string_writable": false
     },
     {
@@ -1375,6 +1400,10 @@
             "label": "double bass"
           },
           {
+            "curie": "lcma:drums",
+            "label": "drums"
+          },
+          {
             "curie": "lcma:flute",
             "label": "flute"
           },
@@ -1535,6 +1564,10 @@
           {
             "curie": "lcma:double_bass",
             "label": "double bass"
+          },
+          {
+            "curie": "lcma:drums",
+            "label": "drums"
           },
           {
             "curie": "lcma:flute",
