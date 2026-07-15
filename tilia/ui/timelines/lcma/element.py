@@ -112,7 +112,8 @@ class LcmaFormUI(HierarchyUI):
     def _marker_visible(self, width: float) -> bool:
         """Whether the ⊗ validation-error marker shows at this body width. It rides with the label:
         hidden once the unit is too small to show any label at all (``min`` LOD, where the headline
-        is already shed), so a narrow unit isn't cluttered by a symbol it has no room for."""
+        is already shed), so a narrow unit isn't cluttered by a symbol it has no room for.
+        """
         if not self._has_validation_error:
             return False
         model = self.span_model
@@ -125,7 +126,8 @@ class LcmaFormUI(HierarchyUI):
         setTextWidth, the wrapping — there is no substring cropping. Returns ``""`` for a
         malformed/unreadable unit (model is None) with no visible marker (the plain label is painted
         then); such a unit that IS flagged (and wide enough) returns the marker + its raw label as
-        HTML. An un-annotated unit has a placeholder model, so it renders the ``—`` headline here."""
+        HTML. An un-annotated unit has a placeholder model, so it renders the ``—`` headline here.
+        """
         model = self.span_model
         marker = self._marker_visible(width)
         if model is None:
@@ -247,19 +249,34 @@ class LcmaFormUI(HierarchyUI):
         # when a unit is actually selected — never during plain element creation or in
         # backend-only tests.
         from tilia.ui.timelines.lcma.builder_dock import get_or_create_builder_dock
+        from tilia.ui.timelines.lcma.validation_dock import (
+            get_validation_dock_if_exists,
+        )
 
         dock = get_or_create_builder_dock()
         dock.load_annotation(
             self.timeline_ui.id, self.id, self.get_data("annotation_data")
         )
+        # todo #3: mirror the selection into the validation pane — select this unit's finding row (if
+        # any). The dock is created up front with the timeline UI, so _if_exists normally returns it;
+        # a no-op when absent is fine (nothing to mirror).
+        validation = get_validation_dock_if_exists()
+        if validation is not None:
+            validation.highlight_unit(self.id)
 
     def on_deselect(self) -> None:
         super().on_deselect()
         from tilia.ui.timelines.lcma.builder_dock import get_builder_dock_if_exists
+        from tilia.ui.timelines.lcma.validation_dock import (
+            get_validation_dock_if_exists,
+        )
 
         dock = get_builder_dock_if_exists()
         if dock is not None:
             dock.clear_annotation(self.id)
+        validation = get_validation_dock_if_exists()
+        if validation is not None:
+            validation.clear_highlight(self.id)
 
     def focus_dedicated_editor(self) -> None:
         # Enter/Return over a selected LCMA unit routes here (see qtui.on_timeline_element_inspect):

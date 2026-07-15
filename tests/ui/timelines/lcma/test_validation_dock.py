@@ -28,6 +28,21 @@ def _feed(dock, diagnostics):
     dock._on_diagnostics(json.dumps(diagnostics))
 
 
+def _error(index, name=""):
+    """A minimal error diagnostic flagging the unit at `index` in the session order."""
+    return {
+        "index": index,
+        "name": name,
+        "severity": "error",
+        "code": "x",
+        "message": "m",
+    }
+
+
+def _row_component_id(item):
+    return item.data(0, Qt.ItemDataRole.UserRole)
+
+
 class _FakePage:
     """Stand-in for the headless QWebEnginePage: runJavaScript returns a canned result at once."""
 
@@ -132,10 +147,95 @@ class TestClickSelectsUnit:
         assert unit.id in [el.id for el in lcma_tlui.selected_elements]
 
 
+class TestClickScrollsToUnit:
+    """todo #4: clicking a finding scrolls the timeline to the flagged unit (centred on its start),
+    so the finding you clicked isn't pointing off-screen."""
+
+    def test_clicking_finding_centres_timeline_on_unit_start(
+        self, lcma_tlui, lcma_tl, monkeypatch
+    ):
+        dock = _dock()
+        unit = lcma_tl.create_lcma_form(3, 5, 1)[0]  # start = 3
+        dock._ordered_ids = [unit.id]
+        _feed(dock, [_error(0)])
+        calls = []
+        monkeypatch.setattr(
+            lcma_tlui.collection, "center_on_time", lambda t: calls.append(t)
+        )
+
+        dock._on_item_clicked(dock._tree.topLevelItem(0), 0)
+
+        assert calls == [lcma_tlui.get_element(unit.id).get_data("start")]
+
+
+class TestSelectionMirrorsToRow:
+    """todo #3: selecting a unit on the timeline mirror-selects its finding row (the reverse of the
+    click path); deselecting clears it; a unit with no finding clears any prior highlight; and a
+    recompute that rebuilds the tree keeps the selected unit's row highlighted. Driven end-to-end
+    through the element select path (LcmaFormUI.on_select -> dock.highlight_unit)."""
+
+    def test_selecting_unit_selects_its_row(self, lcma_tlui, lcma_tl):
+        dock = _dock()
+        u0 = lcma_tl.create_lcma_form(0, 1, 1)[0]
+        u1 = lcma_tl.create_lcma_form(1, 2, 1)[0]
+        dock._ordered_ids = [u0.id, u1.id]  # natural order: level, start
+        _feed(dock, [_error(0), _error(1)])
+
+        lcma_tlui.select_element(lcma_tlui.get_element(u1.id))
+
+        current = dock._tree.currentItem()
+        assert current is not None
+        assert _row_component_id(current) == u1.id
+
+    def test_deselecting_unit_clears_the_row(self, lcma_tlui, lcma_tl):
+        dock = _dock()
+        u0 = lcma_tl.create_lcma_form(0, 1, 1)[0]
+        dock._ordered_ids = [u0.id]
+        _feed(dock, [_error(0)])
+        ui = lcma_tlui.get_element(u0.id)
+
+        lcma_tlui.select_element(ui)
+        assert dock._tree.currentItem() is not None
+        lcma_tlui.deselect_element(ui)
+
+        assert dock._tree.currentItem() is None
+
+    def test_selecting_unit_without_finding_clears_prior_highlight(
+        self, lcma_tlui, lcma_tl
+    ):
+        dock = _dock()
+        u0 = lcma_tl.create_lcma_form(0, 1, 1)[0]  # flagged
+        u1 = lcma_tl.create_lcma_form(1, 2, 1)[0]  # clean, no row
+        dock._ordered_ids = [u0.id, u1.id]
+        _feed(dock, [_error(0)])
+
+        lcma_tlui.select_element(lcma_tlui.get_element(u0.id))
+        assert dock._tree.currentItem() is not None  # u0's row
+        lcma_tlui.select_element(lcma_tlui.get_element(u1.id))  # clean unit
+
+        assert dock._tree.currentItem() is None
+
+    def test_recompute_keeps_selected_units_row_highlighted(self, lcma_tlui, lcma_tl):
+        dock = _dock()
+        u0 = lcma_tl.create_lcma_form(0, 1, 1)[0]
+        dock._ordered_ids = [u0.id]
+        _feed(dock, [_error(0)])
+        lcma_tlui.select_element(lcma_tlui.get_element(u0.id))
+        assert _row_component_id(dock._tree.currentItem()) == u0.id
+
+        _feed(
+            dock, [_error(0)]
+        )  # a recompute rebuilds the tree (clear() drops selection)
+
+        current = dock._tree.currentItem()
+        assert current is not None and _row_component_id(current) == u0.id
+
+
 class TestElementErrorMarkers:
     """The dock mirrors each unit's worst severity onto its element (todo #3): an ERROR flags the
     element so it paints the ⊗ marker, anything else clears it. Here the finding JSON is fed
-    directly; the element-side paint is covered in test_element_render.TestValidationErrorMarker."""
+    directly; the element-side paint is covered in test_element_render.TestValidationErrorMarker.
+    """
 
     @staticmethod
     def _element(dock, cmp_id):
