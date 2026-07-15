@@ -50,10 +50,11 @@ class LcmaValidationDock(ViewDockWidget):
     One instance per session (get-or-create via Get.LCMA_VALIDATION), bound to the first LCMA
     timeline. It gathers every unit's JSON-LD (session_io), runs the annotation-ui ``diagnose()``
     lint headlessly in an INVISIBLE QWebEnginePage (validator.html), and lists the findings in a
-    native tree — errors first, then warnings (the engine already sorts). Clicking a finding
-    selects the offending unit, which (through the normal on_select path) also loads it into the
-    builder. Recomputes, debounced, whenever a unit on the bound timeline is created, deleted, or
-    edited.
+    native tree — errors first, then warnings (the engine already sorts). Selection is two-way:
+    clicking a finding selects the offending unit, scrolls the timeline to it (todo #4) and — through
+    the normal on_select path — loads it into the builder; conversely, selecting a unit on the
+    timeline mirror-selects its finding row (todo #3, via highlight_unit / clear_highlight). Recomputes,
+    debounced, whenever a unit on the bound timeline is created, deleted, or edited.
 
     The lint itself is NOT reimplemented here: reusing the vendored JS keeps it in step with the
     annotation-ui app, which owns and actively develops the rules.
@@ -76,6 +77,11 @@ class LcmaValidationDock(ViewDockWidget):
         # index -> component id for the last computed session, so a clicked finding
         # (Diagnostic.index) maps back to the unit it flags.
         self._ordered_ids: list[int] = []
+        # The unit whose row is currently mirror-selected (todo #3): set when a unit is selected on
+        # the timeline, cleared on its deselect. Kept so the highlight can be re-applied after a
+        # recompute rebuilds the tree, and so a stale deselect (deselect-all THEN select on a normal
+        # click) doesn't wipe the freshly selected unit's row.
+        self._highlighted_id: int | None = None
         # The engine is callable only after validator.html finishes loading; a recompute asked
         # for before then is dropped and subsumed by the initial recompute on load.
         self._engine_ready = False
@@ -208,6 +214,10 @@ class LcmaValidationDock(ViewDockWidget):
                 item.setData(0, _COMPONENT_ID_ROLE, self._ordered_ids[index])
             self._tree.addTopLevelItem(item)
 
+        # clear() above dropped the selection; restore the selected unit's row (if it still has a
+        # finding) so editing a unit doesn't lose its mirror-highlight on the ensuing recompute.
+        self._reapply_highlight()
+
     @staticmethod
     def _summary_text(errors: int, warnings: int) -> str:
         if not errors and not warnings:
@@ -243,7 +253,7 @@ class LcmaValidationDock(ViewDockWidget):
             if element is not None:
                 element.set_validation_error(cmp_id in error_ids)
 
-    # --- click -> select the flagged unit ---
+    # --- click -> select + reveal the flagged unit (todo #4) ---
 
     def _on_item_clicked(self, item: QTreeWidgetItem, _column: int):
         cmp_id = item.data(0, _COMPONENT_ID_ROLE)
@@ -259,6 +269,54 @@ class LcmaValidationDock(ViewDockWidget):
         # builder, so a clicked finding both highlights the unit and opens it for editing.
         element.timeline_ui.deselect_all_elements()
         element.timeline_ui.select_element(element)
+        # todo #4: scroll the timeline so the unit is on screen — a finding is useless if you can't
+        # see the unit it flags. center_on_time is the same horizontal-centring the auto-scroll uses;
+        # we centre on the unit's start (its left edge), so the whole band opens to its right.
+        element.timeline_ui.collection.center_on_time(element.get_data("start"))
+
+    # --- timeline selection -> mirror-highlight the unit's row (todo #3) ---
+
+    def highlight_unit(self, component_id: int) -> None:
+        """Select this unit's finding row, mirroring a timeline selection into the Problems pane so
+        the active unit's finding is visible without hunting for it. A unit with no finding clears
+        the selection instead (nothing to point at). Driven from LcmaFormUI.on_select; the reverse of
+        _on_item_clicked, so pane and timeline stay in sync both ways."""
+        self._highlighted_id = component_id
+        item = self._find_item_for_component(component_id)
+        if item is None:
+            self._clear_selection()
+            return
+        self._tree.setCurrentItem(item)
+        self._tree.scrollToItem(item)
+
+    def clear_highlight(self, component_id: int) -> None:
+        """Drop the mirror-highlight when its unit is deselected. Scoped by id: on a normal click the
+        old unit's deselect can arrive AFTER the new unit's select (deselect-all then select), and
+        this guard keeps that stale deselect from wiping the new unit's highlight."""
+        if self._highlighted_id != component_id:
+            return
+        self._highlighted_id = None
+        self._clear_selection()
+
+    def _reapply_highlight(self) -> None:
+        # Re-select the tracked unit's row after a recompute rebuilt the tree. No scrollToItem here:
+        # a recompute (e.g. the user edited the unit) shouldn't yank the pane's scroll position.
+        if self._highlighted_id is None:
+            return
+        item = self._find_item_for_component(self._highlighted_id)
+        if item is not None:
+            self._tree.setCurrentItem(item)
+
+    def _find_item_for_component(self, component_id: int) -> QTreeWidgetItem | None:
+        for i in range(self._tree.topLevelItemCount()):
+            item = self._tree.topLevelItem(i)
+            if item.data(0, _COMPONENT_ID_ROLE) == component_id:
+                return item
+        return None
+
+    def _clear_selection(self) -> None:
+        self._tree.clearSelection()
+        self._tree.setCurrentItem(None)
 
     def deleteLater(self):
         stop_listening_to_all(self)
