@@ -27,6 +27,13 @@
         "subtypes": []
       },
       {
+        "name": "arrival",
+        "abbr": "arr",
+        "aliases": [],
+        "status": "provisional",
+        "subtypes": []
+      },
+      {
         "name": "basic_idea",
         "abbr": "bi",
         "aliases": [
@@ -51,6 +58,13 @@
         "subtypes": []
       },
       {
+        "name": "break",
+        "abbr": "brk",
+        "aliases": [],
+        "status": "provisional",
+        "subtypes": []
+      },
+      {
         "name": "bridge",
         "abbr": "br",
         "aliases": [
@@ -62,12 +76,29 @@
         ]
       },
       {
+        "name": "build_up",
+        "abbr": "bu",
+        "aliases": [
+          "build-up",
+          "buildup"
+        ],
+        "status": "provisional",
+        "subtypes": []
+      },
+      {
         "name": "cadential_idea",
         "abbr": "cad",
         "aliases": [
           "cad",
           "cadential subphrase"
         ],
+        "subtypes": []
+      },
+      {
+        "name": "call",
+        "abbr": "call",
+        "aliases": [],
+        "status": "provisional",
         "subtypes": []
       },
       {
@@ -161,6 +192,67 @@
         "subtypes": []
       },
       {
+        "name": "core",
+        "abbr": "core",
+        "aliases": [],
+        "status": "provisional",
+        "subtypes": []
+      },
+      {
+        "name": "count_in",
+        "abbr": "cin",
+        "aliases": [
+          "count in",
+          "count-in"
+        ],
+        "status": "provisional",
+        "subtypes": []
+      },
+      {
+        "name": "cycle",
+        "abbr": "cyc",
+        "aliases": [
+          "cycle"
+        ],
+        "subtypes": []
+      },
+      {
+        "name": "cycle_chorusified",
+        "abbr": "cycle.chorusified",
+        "aliases": [
+          "cycle.chorusified"
+        ],
+        "status": "provisional",
+        "subtypes": []
+      },
+      {
+        "name": "cycle_final",
+        "abbr": "cycle.final",
+        "aliases": [
+          "cycle.final"
+        ],
+        "status": "provisional",
+        "subtypes": []
+      },
+      {
+        "name": "cycle_initial",
+        "abbr": "cycle.initial",
+        "aliases": [
+          "cycle.initial"
+        ],
+        "status": "provisional",
+        "subtypes": []
+      },
+      {
+        "name": "cycle_inner",
+        "abbr": "cycle.inner",
+        "aliases": [
+          "cycle.inner"
+        ],
+        "status": "provisional",
+        "subtypes": []
+      },
+      {
         "name": "departure_srdc",
         "abbr": "d",
         "aliases": [
@@ -230,6 +322,15 @@
         "aliases": [
           "lin"
         ],
+        "subtypes": []
+      },
+      {
+        "name": "lift_off",
+        "abbr": "lo",
+        "aliases": [
+          "lift-off"
+        ],
+        "status": "provisional",
         "subtypes": []
       },
       {
@@ -333,6 +434,13 @@
         "subtypes": []
       },
       {
+        "name": "ramp",
+        "abbr": "ramp",
+        "aliases": [],
+        "status": "provisional",
+        "subtypes": []
+      },
+      {
         "name": "recapitulation",
         "abbr": "recap",
         "aliases": [
@@ -350,6 +458,15 @@
           "refrain_head",
           "refrain_tail"
         ]
+      },
+      {
+        "name": "response",
+        "abbr": "resp",
+        "aliases": [
+          "response"
+        ],
+        "status": "provisional",
+        "subtypes": []
       },
       {
         "name": "restatement_srdc",
