@@ -1,0 +1,57 @@
+name: bump lcma assets
+
+# Auto-vendor freshly released annotation-ui web bundles (embed.html,
+# validator.html, vocab.json) into the LCMA fork. Triggered by
+# lcma-annotation-ui's release-bundles.yml via repository_dispatch.
+#
+# Fully automatic, no PR: commits straight to `dev`. Deliberately does NOT tag,
+# so the desktop (Nuitka) build in build.yml is never triggered — cutting a
+# desktop release stays a manual, human gesture.
+#
+# Requires repo secret DISPATCH_TOKEN — a fine-grained PAT (or GitHub App token)
+# with Contents: Read on MusicalForm/lcma-annotation-ui (download the release)
+# and Contents: Write on this repo (push the commit).
+
+on:
+  repository_dispatch:
+    types: [ui-released]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'annotation-ui release tag to vendor (e.g. v0.1.8)'
+        required: true
+
+concurrency:
+  group: bump-lcma-assets
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    env:
+      UI_TAG: ${{ github.event.client_payload.tag || github.event.inputs.tag }}
+      GH_TOKEN: ${{ secrets.DISPATCH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+          token: ${{ secrets.DISPATCH_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Vendor the released bundles
+        run: python scripts/sync_lcma_assets.py --from-release "$UI_TAG" --repo MusicalForm/lcma-annotation-ui
+
+      - name: Commit + push to dev (no tag -> no desktop build)
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "vendored assets already current for $UI_TAG - nothing to do."
+            exit 0
+          fi
+          git config user.name  "lcma-bot"
+          git config user.email "lcma@bruckneruni.at"
+          git add -A
+          git commit -m "vendor: lcma web assets from annotation-ui $UI_TAG"
+          git push origin HEAD:dev
