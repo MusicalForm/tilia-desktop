@@ -53,5 +53,7 @@ jobs:
           git config user.name  "lcma-bot"
           git config user.email "lcma@bruckneruni.at"
           git add -A
-          git commit -m "vendor: lcma web assets from annotation-ui $UI_TAG"
+          # [skip ci]: this bot commit is terminal (no tag, no downstream trigger),
+          # so there's nothing to test here — skip run-tests.yml on the auto-vendor.
+          git commit -m "vendor: lcma web assets from annotation-ui $UI_TAG [skip ci]"
           git push origin HEAD:dev
