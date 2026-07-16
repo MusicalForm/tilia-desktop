@@ -109,6 +109,15 @@
         "subtypes": []
       },
       {
+        "name": "closing_section",
+        "abbr": "cls",
+        "aliases": [
+          "ClS",
+          "clsc"
+        ],
+        "subtypes": []
+      },
+      {
         "name": "closing_theme",
         "abbr": "cls",
         "aliases": [
@@ -341,6 +350,16 @@
         "subtypes": []
       },
       {
+        "name": "main_theme",
+        "abbr": "mt",
+        "aliases": [
+          "MT",
+          "main theme",
+          "mt"
+        ],
+        "subtypes": []
+      },
+      {
         "name": "middle",
         "abbr": "mid",
         "aliases": [
@@ -558,6 +577,15 @@
         "subtypes": []
       },
       {
+        "name": "subordinate_theme",
+        "abbr": "subt",
+        "aliases": [
+          "subordinate theme",
+          "subt"
+        ],
+        "subtypes": []
+      },
+      {
         "name": "terminal_climax",
         "abbr": "tc",
         "aliases": [
@@ -618,6 +646,14 @@
         "abbr": "esc",
         "aliases": [
           "esc"
+        ]
+      },
+      {
+        "name": "evaded_cadence",
+        "abbr": "EC",
+        "aliases": [
+          "DC",
+          "evaded"
         ]
       },
       {
@@ -1307,6 +1343,10 @@
           {
             "curie": "fn:essential_sonata_closure",
             "label": "essential sonata closure"
+          },
+          {
+            "curie": "fn:evaded_cadence",
+            "label": "evadedcadence"
           },
           {
             "curie": "fn:hc",
