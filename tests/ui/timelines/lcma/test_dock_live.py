@@ -117,6 +117,8 @@ def test_dock_boots_and_round_trips(lcma_tl, lcma_form, lcma_tlui):
         ), "QWebChannel bridge never became ready (backend.ready not called)"
 
         dock.load_annotation(lcma_tl.id, lcma_form.id, lcma_form.annotation_data or "")
+        QTest.qWait(400)  # let loadAnnotation's channel hop + the embed's React hydration settle
+        #                   before typing — else the input+⌘⏎ races an unflushed draft -> forms:[]
 
         # 2. JS -> Py: a ⌘⏎ commit writes JSON-LD (with the committed function) onto the component
         _run_js(dock, _commit_function_js("verse"))
