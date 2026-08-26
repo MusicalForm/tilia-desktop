@@ -139,10 +139,15 @@ def _load_abbr(vocab: dict) -> tuple[dict[str, str], dict[str, str], dict[str, s
     # specific, then generic_units, then cadences — last wins on a name collision, matching the
     # web's FUNCTION_ABBR construction order (vocab.ts). Cadences are a first-class function group
     # now (vocab.json functions.cadences); include them so a cadence headline still abbreviates.
+    # `subtypes` last: ontology v0.2.0 unified the main/subtype relation and moved the fn:cycle_*
+    # terms out of `specific` into it, so without this a stored `cycle_inner` headline loses its
+    # abbreviation and renders the raw localname instead of `cycle.inner`. No subtype name
+    # collides with a function name, so the position is free.
     function_abbr = {
         **amap(fns.get("specific", [])),
         **amap(fns.get("generic_units", [])),
         **amap(fns.get("cadences", [])),
+        **amap(fns.get("subtypes", [])),
     }
     type_abbr = amap(vocab.get("types", {}).get("main", []))
     placeholder_abbr = amap(vocab.get("placeholders", []))
