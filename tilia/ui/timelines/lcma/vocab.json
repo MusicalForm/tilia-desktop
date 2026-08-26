@@ -222,43 +222,12 @@
         "aliases": [
           "cycle"
         ],
-        "subtypes": []
-      },
-      {
-        "name": "cycle_chorusified",
-        "abbr": "cycle.chorusified",
-        "aliases": [
-          "cycle.chorusified"
-        ],
-        "status": "provisional",
-        "subtypes": []
-      },
-      {
-        "name": "cycle_final",
-        "abbr": "cycle.final",
-        "aliases": [
-          "cycle.final"
-        ],
-        "status": "provisional",
-        "subtypes": []
-      },
-      {
-        "name": "cycle_initial",
-        "abbr": "cycle.initial",
-        "aliases": [
-          "cycle.initial"
-        ],
-        "status": "provisional",
-        "subtypes": []
-      },
-      {
-        "name": "cycle_inner",
-        "abbr": "cycle.inner",
-        "aliases": [
-          "cycle.inner"
-        ],
-        "status": "provisional",
-        "subtypes": []
+        "subtypes": [
+          "cycle_chorusified",
+          "cycle_final",
+          "cycle_initial",
+          "cycle_inner"
+        ]
       },
       {
         "name": "departure_srdc",
@@ -621,7 +590,7 @@
     "cadences": [
       {
         "name": "cadence",
-        "abbr": "cad.",
+        "abbr": "cadence",
         "aliases": [
           "cadence"
         ]
@@ -785,7 +754,9 @@
           "bridge.classic",
           "classic bridge",
           "middle eight"
-        ]
+        ],
+        "main": "bridge",
+        "written": "bridge.classic"
       },
       {
         "name": "bridge_modern",
@@ -793,7 +764,49 @@
         "aliases": [
           "bridge.modern",
           "modern bridge"
-        ]
+        ],
+        "main": "bridge",
+        "written": "bridge.modern"
+      },
+      {
+        "name": "cycle_chorusified",
+        "abbr": "cycle.chorusified",
+        "aliases": [
+          "cycle.chorusified"
+        ],
+        "main": "cycle",
+        "written": "cycle.chorusified",
+        "status": "provisional"
+      },
+      {
+        "name": "cycle_final",
+        "abbr": "cycle.final",
+        "aliases": [
+          "cycle.final"
+        ],
+        "main": "cycle",
+        "written": "cycle.final",
+        "status": "provisional"
+      },
+      {
+        "name": "cycle_initial",
+        "abbr": "cycle.initial",
+        "aliases": [
+          "cycle.initial"
+        ],
+        "main": "cycle",
+        "written": "cycle.initial",
+        "status": "provisional"
+      },
+      {
+        "name": "cycle_inner",
+        "abbr": "cycle.inner",
+        "aliases": [
+          "cycle.inner"
+        ],
+        "main": "cycle",
+        "written": "cycle.inner",
+        "status": "provisional"
       },
       {
         "name": "refrain_head",
@@ -802,7 +815,9 @@
           "head refrain",
           "refrain-head",
           "refrain.head"
-        ]
+        ],
+        "main": "refrain",
+        "written": "refrain.head"
       },
       {
         "name": "refrain_tail",
@@ -811,7 +826,9 @@
           "refrain-tail",
           "refrain.tail",
           "tail refrain"
-        ]
+        ],
+        "main": "refrain",
+        "written": "refrain.tail"
       }
     ],
     "subtypes_by_main": {
@@ -822,6 +839,12 @@
       "bridge": [
         "bridge_classic",
         "bridge_modern"
+      ],
+      "cycle": [
+        "cycle_chorusified",
+        "cycle_final",
+        "cycle_initial",
+        "cycle_inner"
       ]
     }
   },
@@ -1003,6 +1026,15 @@
         "subtypes": []
       },
       {
+        "name": "small_ternary",
+        "abbr": "small_ternary",
+        "aliases": [
+          "small ternary",
+          "smallternary"
+        ],
+        "subtypes": []
+      },
+      {
         "name": "sonata_form",
         "abbr": "sonata",
         "aliases": [
@@ -1070,17 +1102,29 @@
       {
         "name": "balanced",
         "abbr": "balanced",
-        "aliases": []
+        "aliases": [
+          "simple_binary.balanced"
+        ],
+        "main": "simple_binary",
+        "written": "simple_binary.balanced"
       },
       {
         "name": "da_capo",
         "abbr": "da_capo",
-        "aliases": []
+        "aliases": [
+          "ternary.da_capo"
+        ],
+        "main": "ternary",
+        "written": "ternary.da_capo"
       },
       {
         "name": "through_composed",
         "abbr": "through_composed",
-        "aliases": []
+        "aliases": [
+          "ternary.through_composed"
+        ],
+        "main": "ternary",
+        "written": "ternary.through_composed"
       }
     ],
     "subtypes_by_main": {
